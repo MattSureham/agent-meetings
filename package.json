@@ -1,0 +1,27 @@
+{
+  "name": "agent-meetings",
+  "version": "0.1.0",
+  "description": "A framework for enabling technical meetings and communication between AI agents and LLMs",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "llm",
+    "multi-agent",
+    "meetings",
+    "communication"
+  ],
+  "author": "Matt Sureham",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}
