@@ -11,6 +11,8 @@ export { AnthropicAdapter } from './llm/anthropic.js';
 export { OpenAIAdapter } from './llm/openai.js';
 export { GeminiAdapter } from './llm/gemini.js';
 export { OllamaAdapter } from './llm/ollama.js';
+export { DeepSeekAdapter } from './llm/deepseek.js';
+export { MinimaxAdapter } from './llm/minimax.js';
 
 export {
   MeetingEngine,

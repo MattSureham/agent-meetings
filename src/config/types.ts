@@ -22,7 +22,7 @@ export interface LLMAgentDef {
   name: string;
   type: 'llm';
   capabilities: string[];
-  provider: 'anthropic' | 'openai' | 'gemini' | 'ollama';
+  provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'deepseek' | 'minimax';
   model: string;
   apiKey: string;
   endpoint?: string;

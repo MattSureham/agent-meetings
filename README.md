@@ -117,7 +117,7 @@ agents:
     apiKey: "${ANTHROPIC_API_KEY}"     # reads from ANTHROPIC_API_KEY env var
 ```
 
-Supported providers: `anthropic`, `openai`, `gemini`, `ollama` (local models).
+Supported providers: `anthropic`, `openai`, `gemini`, `deepseek`, `minimax`, `ollama` (local models).
 
 #### Protocol agents (WebSocket)
 
@@ -187,78 +187,113 @@ Each turn has a configurable timeout (`turnTimeoutMs`, default 60,000ms). If an 
 ### Prerequisites
 
 - Node.js 18+ (for built-in `fetch` and `crypto`)
-- Optional: one or more LLM API keys (Anthropic, OpenAI, Gemini) or a local Ollama instance
+- One or more LLM API keys from your preferred provider (see supported providers below)
 
 ### Setup
 
 ```bash
-# Clone and install
 git clone <repo>
 cd agent-meetings
-npm install
-
-# Build
-npm run build
-
-# Copy and customize the example config
+npm install && npm run build
 cp meetings.config.example.yml meetings.config.yml
 ```
 
-Edit `meetings.config.yml` to add your API keys. You can either put them directly in the file (for local dev) or use environment variables:
+### Define your agents
+
+Edit `meetings.config.yml` and add your agents. API keys go in environment variables — the config reads them with `${VAR}` syntax:
 
 ```yaml
 agents:
-  - id: claude-sonnet
-    name: "Claude Sonnet"
+  - id: deepseek
+    name: "DeepSeek"
     type: llm
-    capabilities: [analysis, reasoning]
-    provider: anthropic
-    model: claude-sonnet-4-20250514
-    apiKey: "${ANTHROPIC_API_KEY}"    # reads from environment
+    capabilities: [architecture, planning, coding]
+    provider: deepseek
+    model: deepseek-chat
+    apiKey: "${DEEPSEEK_API_KEY}"
+
+  - id: minimax
+    name: "MiniMax"
+    type: llm
+    capabilities: [brainstorming, creative, design]
+    provider: minimax
+    model: abab6.5s-chat
+    apiKey: "${MINIMAX_API_KEY}"
 ```
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export OPENAI_API_KEY=sk-...
+export DEEPSEEK_API_KEY=sk-...
+export MINIMAX_API_KEY=...
 ```
 
-### Run a meeting
+### Run a meeting (one command)
 
-**Terminal 1 — start the server:**
+The `run` command does everything in one shot — loads your config, runs the debate, streams the transcript live to your terminal, and prints the summary at the end. No server to start, no second terminal.
+
 ```bash
+agent-meetings run \
+  -t "Plan and spec a new URL shortener SaaS — architecture, stack, and launch strategy" \
+  -a deepseek,minimax
+```
+
+What you'll see:
+
+```
+╔══════════════════════════════════════════════╗
+║         AGENT MEETINGS — Live Session        ║
+╠══════════════════════════════════════════════╣
+║ Topic: Plan and spec a new URL shortener ... ║
+╠══════════════════════════════════════════════╣
+║ Participants:                                  ║
+║   • DeepSeek (llm)                             ║
+║   • MiniMax (llm)                              ║
+║ Moderator: DeepSeek                            ║
+╚══════════════════════════════════════════════╝
+
+── OPENING — topic introduction ─────────────────
+  ◆ [16:15:32] Moderator:
+    MEETING TOPIC: Plan and spec a new URL shortener...
+
+── POSITION — agents state their views ──────────
+  ◇ [16:15:45] DeepSeek:
+    For the URL shortener, I recommend a serverless architecture...
+
+  ◇ [16:15:58] MiniMax:
+    I think we should consider a Rust-based backend with PostgreSQL...
+
+── REBUTTAL — agents respond to each other ──────
+  ◇ [16:16:12] DeepSeek:
+    MiniMax raises a good point about Rust, but serverless gives us...
+
+  ◇ [16:16:25] MiniMax:
+    The serverless approach has cold start concerns at scale...
+
+  ... (deliberation, voting, summary follow) ...
+
+═══════════════════════════════════════════════
+              MEETING SUMMARY
+═══════════════════════════════════════════════
+
+Consensus: Use a hybrid approach — serverless API + PostgreSQL...
+Key Points:
+  • Cloudflare Workers for the redirect layer
+  • PostgreSQL for analytics and user management
+  • Next.js for the dashboard
+  ...
+```
+
+### Server mode (multi-meeting, background, WebSocket agents)
+
+If you want a persistent server for multiple meetings or external protocol agents:
+
+```bash
+# Terminal 1
 agent-meetings serve
-# Server listening on http://0.0.0.0:4200
-```
 
-**Terminal 2 — check what agents are available:**
-```bash
-agent-meetings list agents
-# Agents (2):
-#   claude-sonnet — Claude Sonnet [llm]
-#   gpt-4 — GPT-4 [llm]
-```
-
-**Schedule and run a meeting:**
-```bash
-agent-meetings schedule \
-  -t "Should we migrate from REST to GraphQL for our API?" \
-  -a claude-sonnet,gpt-4 \
-  -m claude-sonnet
-# Meeting scheduled: 3f8a2b1c-...
-```
-
-The meeting runs asynchronously on the server. Each agent takes its turns in sequence — you can watch the server logs to see the phases progress.
-
-**View the results:**
-```bash
-agent-meetings view 3f8a2b1c-...
-# Shows: topic, status, full transcript by phase, summary, vote tally
-```
-
-**List past meetings:**
-```bash
+# Terminal 2
+agent-meetings schedule -t "Architecture review" -a deepseek,minimax
 agent-meetings list meetings
-agent-meetings list meetings --status concluded
+agent-meetings view <id>
 ```
 
 ---
@@ -300,7 +335,7 @@ LLM-specific fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `provider` | `anthropic` \| `openai` \| `gemini` \| `ollama` | Which API to call |
+| `provider` | `anthropic` \| `openai` \| `gemini` \| `deepseek` \| `minimax` \| `ollama` | Which API to call |
 | `model` | string | Model name (e.g., `claude-sonnet-4-20250514`, `gpt-4o`) |
 | `apiKey` | string | API key (use `${ENV_VAR}` for environment variable) |
 | `endpoint` | string | Custom endpoint URL (only needed for Ollama, defaults to `http://127.0.0.1:11434`) |
@@ -319,31 +354,45 @@ LLM-specific fields:
 ## CLI Reference
 
 ```
+agent-meetings run -t <topic> -a <agent-ids> [options]
+  One-shot command — loads config, runs the meeting, streams transcript live.
+  -t, --topic <topic>          Meeting topic (required)
+  -a, --agents <ids>           Comma-separated agent IDs (required)
+  -m, --moderator <id>         Agent ID to act as moderator
+  -x, --context <text>         Background context (text or path to a file)
+  -c, --config <path>          Path to config file (default: ./meetings.config.yml)
+  --turn-timeout <ms>          Turn timeout in ms (default: 60000)
+  --rebuttal-rounds <n>        Max rebuttal rounds (default: 1)
+  --deliberation-turns <n>     Max deliberation turns (default: 10)
+  --no-stream                  Only show summary, not live transcript
+
 agent-meetings serve [options]
-  -p, --port <port>        Port to listen on
-  -c, --config <path>      Path to config file (default: ./meetings.config.yml)
-  -d, --data-dir <path>    Data directory for persistence
+  Start the persistent server (for multiple meetings, WS agents).
+  -p, --port <port>            Port to listen on
+  -c, --config <path>          Path to config file (default: ./meetings.config.yml)
+  -d, --data-dir <path>        Data directory for persistence
 
 agent-meetings schedule -t <topic> -a <agent-ids> [options]
-  -t, --topic <topic>      Meeting topic (required)
-  -a, --agents <ids>       Comma-separated agent IDs (required)
-  -m, --moderator <id>     Agent ID to act as moderator
-  -x, --context <text>     Background context (literal text or path to a file)
-  -s, --server <url>       Server URL (default: http://localhost:4200)
-  --no-auto-start          Schedule without starting immediately
+  Schedule a meeting on a running server.
+  -t, --topic <topic>          Meeting topic (required)
+  -a, --agents <ids>           Comma-separated agent IDs (required)
+  -m, --moderator <id>         Agent ID to act as moderator
+  -x, --context <text>         Background context (literal text or path to a file)
+  -s, --server <url>           Server URL (default: http://localhost:4200)
+  --no-auto-start              Schedule without starting immediately
 
 agent-meetings list <resource>
-  agents                   List registered agents with capabilities
-  meetings                 List all meetings (--status active|concluded|pending|cancelled)
+  agents                       List registered agents with capabilities
+  meetings                     List all meetings (--status active|concluded|pending|cancelled)
 
 agent-meetings view <meeting-id>
   Shows full transcript, summary, vote tally, and metadata
 
 agent-meetings config validate
-  -c, --config <path>      Validate a config file and report errors
+  -c, --config <path>          Validate a config file and report errors
 
 agent-meetings config show
-  -c, --config <path>      Print effective config (API keys masked)
+  -c, --config <path>          Print effective config (API keys masked)
 ```
 
 ---

@@ -23,11 +23,40 @@ export function loadConfig(path?: string): Config {
     capabilities: agent.capabilities ?? [],
   }));
 
+  warnMissingEnvVars(config.agents);
+
   return config;
 }
 
+const missingEnvVars: string[] = [];
+
 function interpolateEnv(raw: string): string {
-  return raw.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] ?? '');
+  return raw.replace(/\$\{(\w+)\}/g, (_, name) => {
+    const value = process.env[name];
+    if (!value) {
+      missingEnvVars.push(name);
+      return '';
+    }
+    return value;
+  });
+}
+
+function warnMissingEnvVars(agents: AgentDef[]): void {
+  if (missingEnvVars.length > 0) {
+    const unique = [...new Set(missingEnvVars)];
+    console.warn('⚠  The following environment variables are referenced in your config but not set:');
+    for (const v of unique) {
+      console.warn(`   $${v}`);
+    }
+    const affected = agents.filter((a) =>
+      'apiKey' in a && a.apiKey === ''
+    );
+    if (affected.length > 0) {
+      console.warn('   Affected agents:', affected.map((a) => a.id).join(', '));
+      console.warn('   These agents may fail when called.');
+    }
+    console.warn();
+  }
 }
 
 function validateConfig(config: Config): void {

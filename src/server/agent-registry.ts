@@ -8,6 +8,8 @@ import { AnthropicAdapter } from '../llm/anthropic.js';
 import { OpenAIAdapter } from '../llm/openai.js';
 import { GeminiAdapter } from '../llm/gemini.js';
 import { OllamaAdapter } from '../llm/ollama.js';
+import { DeepSeekAdapter } from '../llm/deepseek.js';
+import { MinimaxAdapter } from '../llm/minimax.js';
 
 export class AgentRegistry {
   private agents: Map<string, IAgent> = new Map();
@@ -149,6 +151,10 @@ export class AgentRegistry {
         return new GeminiAdapter(apiKey, model);
       case 'ollama':
         return new OllamaAdapter(model, endpoint);
+      case 'deepseek':
+        return new DeepSeekAdapter(apiKey, model);
+      case 'minimax':
+        return new MinimaxAdapter(apiKey, model);
       default:
         throw new Error(`Unknown LLM provider: ${provider}`);
     }

@@ -1,6 +1,6 @@
 # Agent Meetings — Example Configuration
 #
-# Copy this file to meetings.config.yml and customize.
+# Copy this file to meetings.config.yml, add your API keys, and customize.
 
 server:
   port: 4200
@@ -8,6 +8,61 @@ server:
   dataDir: "./data"
 
 agents:
+  # LLM agent — Anthropic
+  - id: claude-sonnet
+    name: "Claude Sonnet"
+    type: llm
+    capabilities: [analysis, reasoning, writing]
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    apiKey: "${ANTHROPIC_API_KEY}"
+
+  # LLM agent — OpenAI
+  - id: gpt-4
+    name: "GPT-4"
+    type: llm
+    capabilities: [general, creative, brainstorming]
+    provider: openai
+    model: gpt-4o
+    apiKey: "${OPENAI_API_KEY}"
+
+  # LLM agent — DeepSeek
+  - id: deepseek
+    name: "DeepSeek"
+    type: llm
+    capabilities: [architecture, planning, coding, analysis]
+    provider: deepseek
+    model: deepseek-chat
+    apiKey: "${DEEPSEEK_API_KEY}"
+
+  # LLM agent — MiniMax
+  - id: minimax
+    name: "MiniMax"
+    type: llm
+    capabilities: [brainstorming, creative, design, writing]
+    provider: minimax
+    model: abab6.5s-chat
+    apiKey: "${MINIMAX_API_KEY}"
+
+  # LLM agent — Gemini
+  - id: gemini
+    name: "Gemini"
+    type: llm
+    capabilities: [general, coding, multimodal]
+    provider: gemini
+    model: gemini-2.0-flash
+    apiKey: "${GEMINI_API_KEY}"
+
+  # LLM agent — Local Ollama (no API key needed)
+  - id: local-mistral
+    name: "Mistral (Local)"
+    type: llm
+    capabilities: [general, coding]
+    provider: ollama
+    model: mistral
+    apiKey: ""
+    endpoint: "http://127.0.0.1:11434"
+
   # Subprocess agent — spawns claude CLI per turn
   - id: claude-code
     name: "Claude Code"
@@ -27,34 +82,6 @@ agents:
     command: openclaw
     args: ["--prompt", "{prompt}"]
     timeoutMs: 120000
-
-  # LLM agent — OpenAI
-  - id: gpt-4
-    name: "GPT-4"
-    type: llm
-    capabilities: [general, creative, brainstorming]
-    provider: openai
-    model: gpt-4o
-    apiKey: "${OPENAI_API_KEY}"
-
-  # LLM agent — Anthropic
-  - id: claude-sonnet
-    name: "Claude Sonnet"
-    type: llm
-    capabilities: [analysis, reasoning, writing]
-    provider: anthropic
-    model: claude-sonnet-4-20250514
-    apiKey: "${ANTHROPIC_API_KEY}"
-
-  # LLM agent — Local Ollama
-  - id: local-mistral
-    name: "Mistral (Local)"
-    type: llm
-    capabilities: [general, coding]
-    provider: ollama
-    model: mistral
-    apiKey: ""
-    endpoint: "http://127.0.0.1:11434"
 
 meetings:
   turnTimeoutMs: 60000
