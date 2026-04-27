@@ -4,6 +4,59 @@ server:
   dataDir: "./data"
 
 agents:
+  # ── Browser agents (free chat UIs — no API key needed) ──
+  # You log in manually in the browser window that opens.
+
+  - id: chatgpt
+    name: "ChatGPT"
+    type: browser
+    capabilities: [general, creative, brainstorming, coding]
+    site: chatgpt
+    timeoutMs: 120000
+
+  - id: claude-web
+    name: "Claude Web"
+    type: browser
+    capabilities: [analysis, reasoning, writing, coding]
+    site: claude
+    timeoutMs: 120000
+
+  - id: gemini-web
+    name: "Gemini Web"
+    type: browser
+    capabilities: [general, coding, multimodal]
+    site: gemini
+    timeoutMs: 120000
+
+  - id: deepseek-web
+    name: "DeepSeek Web"
+    type: browser
+    capabilities: [coding, analysis, architecture]
+    site: deepseek
+    timeoutMs: 120000
+
+  # ── Builders (subprocess — these can write code, run commands, create files) ──
+
+  - id: claude-code
+    name: "Claude Code"
+    type: subprocess
+    tool: claude-code
+    capabilities: [coding, building, debugging, testing, architecture]
+    command: claude
+    args: ["-p", "{prompt}", "--output-format", "text"]
+    timeoutMs: 180000
+
+  - id: openclaw
+    name: "OpenClaw"
+    type: subprocess
+    tool: generic
+    capabilities: [coding, building, scripting, automation]
+    command: openclaw
+    args: ["--prompt", "{prompt}"]
+    timeoutMs: 180000
+
+  # ── Thinkers (LLM API — reasoning, planning, creative) ──
+
   - id: deepseek
     name: "DeepSeek"
     type: llm

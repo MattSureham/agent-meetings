@@ -4,7 +4,7 @@ export interface StoredAgent {
   id: string;
   name: string;
   capabilities: string[];
-  type: 'subprocess' | 'protocol' | 'llm';
+  type: 'subprocess' | 'protocol' | 'llm' | 'browser';
   status: 'online' | 'offline';
   lastHeartbeat: number;
   registeredAt: number;

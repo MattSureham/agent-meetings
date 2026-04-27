@@ -35,7 +35,7 @@ export interface IAgent {
   readonly id: string;
   readonly name: string;
   readonly capabilities: string[];
-  readonly type: 'subprocess' | 'protocol' | 'llm';
+  readonly type: 'subprocess' | 'protocol' | 'llm' | 'browser';
 
   respond(prompt: MeetingPrompt): Promise<AgentResponse>;
   health(): Promise<AgentHealth>;

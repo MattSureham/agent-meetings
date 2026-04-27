@@ -59,6 +59,44 @@ shutdown() → void                        // cleanup
 
 The server doesn't care how an agent produces its response. It just calls `respond()` on each agent in turn and records what comes back.
 
+#### Browser agents (free chat UIs — no API key needed)
+
+Browser agents use Playwright to control real web chat interfaces. No API key, no billing — you open the free tier of any chat site, log in once in the browser window that pops up, and the session persists. The framework types your prompt, waits for the response, and extracts the text.
+
+```
+Turn start
+  → Navigate to chat site (e.g., chatgpt.com)
+  → Click input box, type the meeting prompt
+  → Press Enter
+  → Wait for stop button to appear (generation started)
+  → Wait for stop button to disappear (generation done)
+  → Extract the assistant's response text
+  → Return it to the meeting
+Turn end
+```
+
+**First run**: a Chromium window opens. Log into your accounts (ChatGPT, Claude, Gemini, DeepSeek). The login session is saved in `~/.agent-meetings/browser/<agent-id>/` so you only need to do this once. Subsequent runs reuse the session.
+
+**Sites supported out of the box**: `chatgpt`, `claude`, `gemini`, `deepseek`.
+
+Add a browser agent to your config:
+
+```yaml
+agents:
+  - id: chatgpt
+    name: "ChatGPT"
+    type: browser
+    capabilities: [general, creative, brainstorming]
+    site: chatgpt
+    timeoutMs: 120000
+```
+
+Run a meeting with free agents only — zero API cost:
+
+```bash
+agent-meetings run -t "Design a REST API for a todo app" -a chatgpt,claude-web,gemini-web
+```
+
 #### Subprocess agents (CLI tools)
 
 For tools like `claude` or `openclaw`, the server spawns a **new child process per turn**. The full meeting context (topic, background, transcript so far, and the current prompt) is formatted as text. The CLI is invoked with that text as an argument. The server reads stdout and treats it as the agent's response.
@@ -188,6 +226,11 @@ Each turn has a configurable timeout (`turnTimeoutMs`, default 60,000ms). If an 
 
 - Node.js 18+ (for built-in `fetch` and `crypto`)
 - One or more LLM API keys from your preferred provider (see supported providers below)
+- **No API key?** Use browser agents — they control free chat UIs (ChatGPT, Claude, Gemini, DeepSeek) through a real browser. Playwright is included. Just log in once.
+- **Optional**: CLI-based agents installed if you want builders that can write code:
+  - [`claude`](https://docs.anthropic.com/en/docs/claude-code) — Claude Code CLI
+  - [`openclaw`](https://github.com/openclaw/openclaw) — OpenClaw agent CLI
+  - Any other CLI tool that accepts a prompt argument
 
 ### Setup
 
@@ -230,10 +273,36 @@ export MINIMAX_API_KEY=...
 
 The `run` command does everything in one shot — loads your config, runs the debate, streams the transcript live to your terminal, and prints the summary at the end. No server to start, no second terminal.
 
+**LLM-only meeting** (thinkers talk through a plan):
 ```bash
 agent-meetings run \
   -t "Plan and spec a new URL shortener SaaS — architecture, stack, and launch strategy" \
   -a deepseek,minimax
+```
+
+**Builder meeting** (agents that can actually write code and create files):
+```bash
+agent-meetings run \
+  -t "Build a URL shortener in Next.js with Redis — create the full project" \
+  -a claude-code,openclaw \
+  -m deepseek
+```
+
+In a builder meeting, the subprocess agents (`claude-code`, `openclaw`) are invoked with the full meeting context. They can read the transcript, reason about what was planned, and **produce actual output** — writing files, running commands, scaffolding projects. The LLM agent (`deepseek`) acts as moderator: it reviews the output, spots gaps, and directs next steps.
+
+**Mixed meeting** (thinker plans, builders implement):
+```bash
+agent-meetings run \
+  -t "Design and build a REST API for a todo app — DeepSeek architects, Claude Code and OpenClaw implement" \
+  -a deepseek,claude-code,openclaw \
+  -m deepseek
+```
+
+**Free meeting** (no API keys at all — uses free chat UIs):
+```bash
+agent-meetings run \
+  -t "Plan our team's Q3 roadmap" \
+  -a chatgpt,claude-web,gemini-web
 ```
 
 What you'll see:

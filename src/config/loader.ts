@@ -93,6 +93,11 @@ function validateConfig(config: Config): void {
         throw new Error(`LLM agent "${agent.id}" requires provider and model`);
       }
     }
+    if (agent.type === 'browser') {
+      if (!agent.site) {
+        throw new Error(`Browser agent "${agent.id}" requires a site`);
+      }
+    }
   }
 
   if (config.meetings.defaultModerator && !ids.has(config.meetings.defaultModerator)) {

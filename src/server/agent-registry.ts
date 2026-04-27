@@ -1,6 +1,6 @@
 import type { IAgent } from '../agent/types.js';
 import type { LLMAdapter } from '../llm/types.js';
-import type { Config, AgentDef, SubprocessAgentDef, LLMAgentDef } from '../config/types.js';
+import type { Config, AgentDef, SubprocessAgentDef, LLMAgentDef, BrowserAgentDef } from '../config/types.js';
 import type { DataStore, StoredAgent } from '../persistence/types.js';
 import { SubprocessAgent } from '../agent/subprocess/adapter.js';
 import { LLMAgent } from '../llm/agent.js';
@@ -10,6 +10,11 @@ import { GeminiAdapter } from '../llm/gemini.js';
 import { OllamaAdapter } from '../llm/ollama.js';
 import { DeepSeekAdapter } from '../llm/deepseek.js';
 import { MinimaxAdapter } from '../llm/minimax.js';
+import { BrowserAgent, getSite } from '../agent/browser/adapter.js';
+import { registerBuiltinSites } from '../agent/browser/sites/index.js';
+
+// Register built-in browser site configs at import time
+registerBuiltinSites();
 
 export class AgentRegistry {
   private agents: Map<string, IAgent> = new Map();
@@ -104,6 +109,9 @@ export class AgentRegistry {
     if (def.type === 'llm') {
       return this.createLLMAgent(def);
     }
+    if (def.type === 'browser') {
+      return this.createBrowserAgent(def);
+    }
     throw new Error(`Unknown agent type for "${(def as AgentDef).id}"`);
   }
 
@@ -118,6 +126,18 @@ export class AgentRegistry {
       cwd: def.cwd,
       timeoutMs: def.timeoutMs,
       promptMode: def.args.some((a) => a.includes('{prompt}')) ? 'argument' : 'stdin',
+    });
+  }
+
+  private createBrowserAgent(def: BrowserAgentDef): BrowserAgent {
+    const site = getSite(def.site);
+    if (!site) throw new Error(`Unknown browser site: ${def.site}`);
+    return new BrowserAgent({
+      id: def.id,
+      name: def.name,
+      capabilities: def.capabilities,
+      site,
+      timeoutMs: def.timeoutMs,
     });
   }
 

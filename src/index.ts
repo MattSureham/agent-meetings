@@ -4,6 +4,7 @@ export { SubprocessManager } from './agent/subprocess/manager.js';
 export { createClaudeCodeAgent } from './agent/subprocess/integrations/claude-code.js';
 export { createGenericSubprocessAgent } from './agent/subprocess/integrations/generic.js';
 export { ProtocolAgent } from './agent/protocol/agent.js';
+export { BrowserAgent, registerSite, getSite } from './agent/browser/adapter.js';
 
 export { LLMAdapter, ChatMessage } from './llm/types.js';
 export { LLMAgent } from './llm/agent.js';

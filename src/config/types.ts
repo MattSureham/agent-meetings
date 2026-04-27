@@ -28,7 +28,16 @@ export interface LLMAgentDef {
   endpoint?: string;
 }
 
-export type AgentDef = SubprocessAgentDef | LLMAgentDef;
+export interface BrowserAgentDef {
+  id: string;
+  name: string;
+  type: 'browser';
+  capabilities: string[];
+  site: 'chatgpt' | 'claude' | 'gemini' | 'deepseek';
+  timeoutMs?: number;
+}
+
+export type AgentDef = SubprocessAgentDef | LLMAgentDef | BrowserAgentDef;
 
 export interface MeetingsConfig {
   turnTimeoutMs: number;
