@@ -80,7 +80,7 @@ agents:
     tool: generic
     capabilities: [python, data-science, ml]
     command: openclaw
-    args: ["--prompt", "{prompt}"]
+    args: ["agent", "--local", "--json", "-m", "{prompt}"]
     timeoutMs: 120000
 
 meetings:

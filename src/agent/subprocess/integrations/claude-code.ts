@@ -11,7 +11,7 @@ export function createClaudeCodeAgent(
     name: 'Claude Code',
     capabilities,
     command: 'claude',
-    args: ['-p', '{prompt}', '--output-format', 'text'],
+    args: ['-p', '{prompt}', '--output-format', 'text', '--permission-mode', 'bypassPermissions', '--bare'],
     promptMode: 'argument',
     timeoutMs: 120_000,
     ...overrides,

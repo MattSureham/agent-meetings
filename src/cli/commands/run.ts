@@ -88,6 +88,16 @@ export function runCommand(): Command {
         maxDeliberationTurns: parseInt(options.deliberationTurns, 10),
         maxTotalTurns: parseInt(options.maxTurns, 10),
         defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
+        onTurnStart: (name) => {
+          if (stream) {
+            process.stdout.write(`  ⏳ Waiting for ${name}...`);
+          }
+        },
+        onTurnEnd: (name) => {
+          if (stream) {
+            process.stdout.write('\r\x1b[K'); // clear the waiting line
+          }
+        },
       });
 
       const phaseLabels: Record<string, string> = {

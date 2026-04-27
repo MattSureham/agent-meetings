@@ -24,6 +24,8 @@ export interface MeetingConfig {
   maxDeliberationTurns?: number;
   maxTotalTurns?: number;
   defaultLLM?: LLMAdapter;
+  onTurnStart?: (agentName: string) => void;
+  onTurnEnd?: (agentName: string) => void;
 }
 
 export class MeetingEngine {
@@ -70,6 +72,8 @@ export class MeetingEngine {
     this.turnManager = new TurnManager();
     this.moderator = new Moderator(config.defaultLLM ?? null);
     this.summarizer = new Summarizer(config.defaultLLM ?? null);
+    this.onTurnStart = config.onTurnStart;
+    this.onTurnEnd = config.onTurnEnd;
   }
 
   private checkTurnLimit(): boolean {
@@ -320,8 +324,12 @@ export class MeetingEngine {
     this.addMessage(this.moderator.systemModeratorId, this.moderator.systemModeratorName, summaryText);
   }
 
+  private onTurnStart?: (agentName: string) => void;
+  private onTurnEnd?: (agentName: string) => void;
+
   private async promptAgent(agent: IAgent, promptText: string): Promise<void> {
     this.totalTurns++;
+    this.onTurnStart?.(agent.name);
 
     const transcriptMessages: TranscriptMessage[] = this.transcript.map((m) => ({
       id: m.id,
@@ -350,6 +358,8 @@ export class MeetingEngine {
         agent.name,
         `[${agent.name} encountered an error and could not respond]`
       );
+    } finally {
+      this.onTurnEnd?.(agent.name);
     }
   }
 
