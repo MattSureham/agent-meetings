@@ -115,13 +115,37 @@ describe('MeetingEngine', () => {
       topic: 'Test',
       context: '',
       participants: agents,
-      turnTimeoutMs: 100, // very short timeout
+      turnTimeoutMs: 100,
       maxDeliberationTurns: 1,
       maxRebuttalRounds: 0,
     });
 
-    // This shouldn't hang — engine internally catches the timeout via the subprocess
-    // But for mock agents, we need to test differently. Let's just verify construction.
     expect(engine.status).toBe('pending');
+  });
+
+  it('enforces maxTotalTurns and ends with turn_limit reason', async () => {
+    const agents = [
+      new MockAgent('a1', 'Alice', ['general']),
+      new MockAgent('a2', 'Bob', ['general']),
+      new MockAgent('a3', 'Carol', ['general']),
+    ];
+
+    const engine = new MeetingEngine({
+      topic: 'Test turn limits',
+      context: '',
+      participants: agents,
+      maxTotalTurns: 3,      // very tight limit — 3 turns means only opening + 2 positions
+      maxRebuttalRounds: 0,
+      maxDeliberationTurns: 0,
+    });
+
+    await engine.start();
+
+    // The meeting should have concluded, even though it didn't finish all phases
+    expect(engine.status).toBe('concluded');
+    expect(engine.reasonEnded).toBe('turn_limit');
+    expect(engine.totalTurns).toBeGreaterThanOrEqual(3);
+    expect(engine.summary).not.toBeNull();
+    expect(engine.transcript.length).toBeGreaterThan(0);
   });
 });

@@ -22,6 +22,7 @@ export interface MeetingConfig {
   turnTimeoutMs?: number;
   maxRebuttalRounds?: number;
   maxDeliberationTurns?: number;
+  maxTotalTurns?: number;
   defaultLLM?: LLMAdapter;
 }
 
@@ -47,7 +48,11 @@ export class MeetingEngine {
   private turnTimeoutMs: number;
   private maxRebuttalRounds: number;
   private maxDeliberationTurns: number;
+  private maxTotalTurns: number;
   private aborted = false;
+  private turnLimitReached = false;
+  private totalTurns = 0;
+  reasonEnded: 'completed' | 'turn_limit' | 'cancelled' = 'completed';
 
   constructor(config: MeetingConfig) {
     this.id = randomUUID();
@@ -57,6 +62,7 @@ export class MeetingEngine {
     this.turnTimeoutMs = config.turnTimeoutMs ?? 60_000;
     this.maxRebuttalRounds = config.maxRebuttalRounds ?? 1;
     this.maxDeliberationTurns = config.maxDeliberationTurns ?? 10;
+    this.maxTotalTurns = config.maxTotalTurns ?? 50;
     this.createdAt = Date.now();
     this.participantIds = config.participants.map((a) => a.id);
 
@@ -66,29 +72,52 @@ export class MeetingEngine {
     this.summarizer = new Summarizer(config.defaultLLM ?? null);
   }
 
+  private checkTurnLimit(): boolean {
+    if (this.totalTurns >= this.maxTotalTurns) {
+      this.turnLimitReached = true;
+      this.reasonEnded = 'turn_limit';
+      this.addMessage(
+        '__system_moderator__',
+        'Moderator',
+        `Maximum turn limit reached (${this.maxTotalTurns} turns). Forcing conclusion.`
+      );
+      return true;
+    }
+    return false;
+  }
+
   async start(): Promise<void> {
     this.status = 'active';
     await this.advancePhase(DebatePhase.OPENING);
     await this.runOpening();
     if (this.aborted) return;
 
-    await this.advancePhase(DebatePhase.POSITION);
-    await this.runRoundRobin(DebatePhase.POSITION);
-    if (this.aborted) return;
-
-    for (let r = 0; r < this.maxRebuttalRounds; r++) {
-      await this.advancePhase(DebatePhase.REBUTTAL);
-      await this.runRoundRobin(DebatePhase.REBUTTAL);
-      if (this.aborted) return;
-      this.turnManager.resetRound();
+    if (!this.turnLimitReached) {
+      await this.advancePhase(DebatePhase.POSITION);
+      await this.runRoundRobin(DebatePhase.POSITION);
     }
-
-    await this.advancePhase(DebatePhase.DELIBERATION);
-    await this.runDeliberation();
     if (this.aborted) return;
 
-    await this.advancePhase(DebatePhase.VOTING);
-    await this.runVoting();
+    if (!this.turnLimitReached) {
+      for (let r = 0; r < this.maxRebuttalRounds; r++) {
+        await this.advancePhase(DebatePhase.REBUTTAL);
+        await this.runRoundRobin(DebatePhase.REBUTTAL);
+        if (this.aborted || this.turnLimitReached) break;
+        this.turnManager.resetRound();
+      }
+    }
+    if (this.aborted) return;
+
+    if (!this.turnLimitReached) {
+      await this.advancePhase(DebatePhase.DELIBERATION);
+      await this.runDeliberation();
+    }
+    if (this.aborted) return;
+
+    if (!this.turnLimitReached) {
+      await this.advancePhase(DebatePhase.VOTING);
+      await this.runVoting();
+    }
     if (this.aborted) return;
 
     await this.advancePhase(DebatePhase.SUMMARY);
@@ -158,6 +187,7 @@ export class MeetingEngine {
 
     while (!this.turnManager.allSpoken()) {
       if (this.aborted) return;
+      if (this.checkTurnLimit()) return;
       const speaker = this.turnManager.nextSpeaker();
       if (!speaker) break;
 
@@ -172,7 +202,6 @@ export class MeetingEngine {
       await this.promptAgent(agent, currentPrompt);
 
       // check for raised hand during position/rebuttal
-      const prefix = `${agent.id}:`;
       const lastMessage = this.transcript
         .slice()
         .reverse()
@@ -190,24 +219,45 @@ export class MeetingEngine {
     const participants = [...this.agents.values()];
     for (const agent of participants) {
       if (this.aborted) return;
+      if (this.checkTurnLimit()) return;
       const prompt = this.moderator.buildDeliberationPrompt(this.topic, agent.name);
       await this.promptAgent(agent, prompt);
       turns++;
       if (turns >= this.maxDeliberationTurns) return;
     }
 
+    let stalemateCount = 0;
+
     // then handle raised hands
     while (this.turnManager.handsRemaining() > 0 && turns < this.maxDeliberationTurns) {
       if (this.aborted) return;
+      if (this.checkTurnLimit()) return;
+
       const agentId = this.turnManager.getNextHand();
       if (!agentId) break;
 
       const agent = this.agents.get(agentId);
       if (!agent) continue;
 
-      const prompt = `You have the floor for deliberation on "${this.topic}". Make your point and respond to others.`;
+      const prompt = `You have the floor for deliberation on "${this.topic}". Make your point and respond to others. If the discussion is going in circles, suggest moving to a vote.`;
       await this.promptAgent(agent, prompt);
       turns++;
+
+      // Stalemate detection: if agents stop raising hands for 2 consecutive rounds
+      // during deliberation, assume they've exhausted discussion
+      if (this.turnManager.handsRemaining() === 0) {
+        stalemateCount++;
+        if (stalemateCount >= 2) {
+          this.addMessage(
+            '__system_moderator__',
+            'Moderator',
+            'Discussion appears to have reached a natural conclusion. Moving to voting.'
+          );
+          return;
+        }
+      } else {
+        stalemateCount = 0;
+      }
     }
   }
 
@@ -217,6 +267,7 @@ export class MeetingEngine {
 
     for (const agent of this.agents.values()) {
       if (this.aborted) return;
+      if (this.checkTurnLimit()) return;
       await this.promptAgent(agent, votePrompt);
     }
   }
@@ -270,6 +321,8 @@ export class MeetingEngine {
   }
 
   private async promptAgent(agent: IAgent, promptText: string): Promise<void> {
+    this.totalTurns++;
+
     const transcriptMessages: TranscriptMessage[] = this.transcript.map((m) => ({
       id: m.id,
       authorId: m.authorId,

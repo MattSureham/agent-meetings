@@ -1,5 +1,6 @@
 import { Command } from 'commander';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadConfig } from '../../config/loader.js';
 import { AgentRegistry } from '../../server/agent-registry.js';
 import { JsonFileStore } from '../../persistence/json-store.js';
@@ -17,6 +18,7 @@ export function runCommand(): Command {
     .option('--turn-timeout <ms>', 'Turn timeout in ms', '60000')
     .option('--rebuttal-rounds <n>', 'Max rebuttal rounds', '1')
     .option('--deliberation-turns <n>', 'Max deliberation turns', '10')
+    .option('--max-turns <n>', 'Maximum total turns before forcing conclusion', '50')
     .option('--no-stream', 'Do not stream transcript; only show summary at the end')
     .action(async (options) => {
       let config;
@@ -73,6 +75,9 @@ export function runCommand(): Command {
       console.log('╚══════════════════════════════════════════════╝');
       console.log();
 
+      const store = new JsonFileStore(config.server.dataDir);
+      await store.init();
+
       const engine = new MeetingEngine({
         topic: options.topic,
         context,
@@ -81,6 +86,7 @@ export function runCommand(): Command {
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
         maxRebuttalRounds: parseInt(options.rebuttalRounds, 10),
         maxDeliberationTurns: parseInt(options.deliberationTurns, 10),
+        maxTotalTurns: parseInt(options.maxTurns, 10),
         defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
       });
 
@@ -129,6 +135,22 @@ export function runCommand(): Command {
       try {
         await engine.start();
       } finally {
+        // Save the full meeting record before shutting down
+        try {
+          const stored = engine.toStoredMeeting();
+          await store.saveMeeting(stored);
+
+          // Write a human-readable log file
+          const logPath = join(config.server.dataDir, 'meetings', `${engine.id}.log`);
+          mkdirSync(join(config.server.dataDir, 'meetings'), { recursive: true });
+          writeFileSync(logPath, formatLog(engine), 'utf-8');
+
+          console.log(`\nMeeting record saved:`);
+          console.log(`  JSON: ${join(config.server.dataDir, 'meetings', `${engine.id}.json`)}`);
+          console.log(`  Log:  ${logPath}`);
+        } catch (e) {
+          console.error('Failed to save meeting record:', (e as Error).message);
+        }
         await registry.shutdown();
       }
 
@@ -166,8 +188,94 @@ export function runCommand(): Command {
         }
       }
 
-      console.log(`Meeting ${engine.id} concluded.`);
+      let endNote = `Meeting ${engine.id} concluded`;
+      if (engine.reasonEnded === 'turn_limit') {
+        endNote += ' (turn limit reached)';
+      } else if (engine.reasonEnded === 'cancelled') {
+        endNote += ' (cancelled)';
+      }
+      endNote += '.';
+      console.log(endNote);
     });
+}
+
+function formatLog(engine: MeetingEngine): string {
+  const lines: string[] = [];
+  lines.push('═'.repeat(60));
+  lines.push(`MEETING: ${engine.topic}`);
+  lines.push(`ID:      ${engine.id}`);
+  lines.push(`STATUS:  ${engine.status}`);
+  lines.push(`ENDED:   ${engine.reasonEnded}`);
+  lines.push(`STARTED: ${new Date(engine.createdAt).toISOString()}`);
+  if (engine.concludedAt) {
+    lines.push(`ENDED:   ${new Date(engine.concludedAt).toISOString()}`);
+  }
+  lines.push(`TURNS:   ${engine.transcript.length}`);
+  lines.push('═'.repeat(60));
+  lines.push('');
+
+  const phaseLabels: Record<string, string> = {
+    opening: '═══ OPENING ═══',
+    position: '═══ POSITION STATEMENTS ═══',
+    rebuttal: '═══ REBUTTALS ═══',
+    deliberation: '═══ DELIBERATION ═══',
+    voting: '═══ VOTING ═══',
+    summary: '═══ SUMMARY ═══',
+    concluded: '═══ CONCLUDED ═══',
+  };
+
+  let lastPhase = '';
+  for (const msg of engine.transcript) {
+    if (msg.phase !== lastPhase) {
+      lastPhase = msg.phase;
+      lines.push('');
+      lines.push(phaseLabels[msg.phase] ?? `─── ${msg.phase.toUpperCase()} ───`);
+      lines.push('');
+    }
+
+    const time = new Date(msg.timestamp).toLocaleTimeString();
+    const indent = msg.authorId === '__system_moderator__' ? '◆' : '  ◇';
+    lines.push(`${indent} [${time}] ${msg.authorName}:`);
+
+    for (const line of msg.content.split('\n')) {
+      lines.push(`    ${line}`);
+    }
+    lines.push('');
+  }
+
+  if (engine.summary) {
+    lines.push('');
+    lines.push('═'.repeat(60));
+    lines.push('STRUCTURED SUMMARY');
+    lines.push('═'.repeat(60));
+    lines.push('');
+    lines.push(`Consensus: ${engine.summary.consensus}`);
+    lines.push('');
+    lines.push('Key Points:');
+    for (const p of engine.summary.keyPoints) {
+      lines.push(`  • ${p}`);
+    }
+    if (engine.summary.dissentingViews.length > 0) {
+      lines.push('');
+      lines.push('Dissenting Views:');
+      for (const v of engine.summary.dissentingViews) {
+        lines.push(`  • ${v}`);
+      }
+    }
+    if (engine.summary.actionItems.length > 0) {
+      lines.push('');
+      lines.push('Action Items:');
+      for (const a of engine.summary.actionItems) {
+        lines.push(`  • ${a}`);
+      }
+    }
+    if (engine.summary.voteTally) {
+      lines.push('');
+      lines.push(`Vote: YES=${engine.summary.voteTally.yes ?? 0} NO=${engine.summary.voteTally.no ?? 0} ABSTAIN=${engine.summary.voteTally.abstain ?? 0}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 function padRight(s: string, len: number): string {

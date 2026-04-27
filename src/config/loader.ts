@@ -105,4 +105,7 @@ function validateConfig(config: Config): void {
       `defaultModerator "${config.meetings.defaultModerator}" not found in agents`
     );
   }
+
+  // Apply defaults
+  config.meetings.maxTotalTurns = config.meetings.maxTotalTurns ?? 50;
 }

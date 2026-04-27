@@ -43,6 +43,7 @@ export interface MeetingsConfig {
   turnTimeoutMs: number;
   maxRebuttalRounds: number;
   maxDeliberationTurns: number;
+  maxTotalTurns: number;
   defaultModerator: string;
 }
 

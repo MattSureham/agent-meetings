@@ -416,6 +416,7 @@ LLM-specific fields:
 | `turnTimeoutMs` | number | 60000 | Max time an agent has to respond to a turn |
 | `maxRebuttalRounds` | number | 1 | How many rounds of rebuttal before deliberation |
 | `maxDeliberationTurns` | number | 10 | Max total turns during the deliberation phase |
+| `maxTotalTurns` | number | 50 | Hard cap on total turns across all phases — meeting forces conclusion when hit |
 | `defaultModerator` | string | — | Agent ID to use as moderator if none specified in the meeting |
 
 ---
@@ -425,6 +426,7 @@ LLM-specific fields:
 ```
 agent-meetings run -t <topic> -a <agent-ids> [options]
   One-shot command — loads config, runs the meeting, streams transcript live.
+  Saves full transcript to data/meetings/<id>.json and .log when done.
   -t, --topic <topic>          Meeting topic (required)
   -a, --agents <ids>           Comma-separated agent IDs (required)
   -m, --moderator <id>         Agent ID to act as moderator
@@ -433,6 +435,7 @@ agent-meetings run -t <topic> -a <agent-ids> [options]
   --turn-timeout <ms>          Turn timeout in ms (default: 60000)
   --rebuttal-rounds <n>        Max rebuttal rounds (default: 1)
   --deliberation-turns <n>     Max deliberation turns (default: 10)
+  --max-turns <n>              Max total turns before forcing conclusion (default: 50)
   --no-stream                  Only show summary, not live transcript
 
 agent-meetings serve [options]
@@ -609,14 +612,16 @@ All data lives in the `dataDir` directory (default `./data`):
 
 ```
 data/
-├── agents.json                # Array of registered agents with health status
+├── agents.json                # Array of registered agents
 └── meetings/
-    ├── <uuid-1>.json          # Full meeting record (topic, transcript, summary, phase timeline)
+    ├── <uuid-1>.json          # Full meeting record (JSON — topic, transcript, summary, phase timeline)
+    ├── <uuid-1>.log           # Human-readable transcript log (same meeting, readable format)
     ├── <uuid-2>.json
+    ├── <uuid-2>.log
     └── ...
 ```
 
-Files are human-readable JSON. You can inspect them directly or query them through the server API / CLI.
+Each `run` command saves two files: a `.json` record for programmatic access and a `.log` file for human reading. Both are written automatically at meeting end. The file paths are printed to the terminal.
 
 ---
 

@@ -87,4 +87,5 @@ meetings:
   turnTimeoutMs: 60000
   maxRebuttalRounds: 1
   maxDeliberationTurns: 10
+  maxTotalTurns: 50
   defaultModerator: claude-sonnet

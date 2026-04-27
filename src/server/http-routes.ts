@@ -122,6 +122,7 @@ export function createRouter(
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationTurns: config.meetings.maxDeliberationTurns,
+          maxTotalTurns: config.meetings.maxTotalTurns,
           defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
         });
 
@@ -183,6 +184,7 @@ export function createRouter(
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationTurns: config.meetings.maxDeliberationTurns,
+          maxTotalTurns: config.meetings.maxTotalTurns,
           defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
         });
 
