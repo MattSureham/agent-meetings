@@ -1,0 +1,30 @@
+import { Command } from 'commander';
+import { createServer } from '../../server/index.js';
+
+export function serveCommand(): Command {
+  return new Command('serve')
+    .description('Start the Agent Meetings server')
+    .option('-p, --port <port>', 'Port to listen on')
+    .option('-c, --config <path>', 'Path to config file', './meetings.config.yml')
+    .option('-d, --data-dir <path>', 'Data directory for persistence')
+    .action(async (options) => {
+      const configPath = options.config;
+
+      try {
+        const server = await createServer(configPath);
+        await server.start();
+
+        const shutdown = async () => {
+          console.log('\nShutting down...');
+          await server.stop();
+          process.exit(0);
+        };
+
+        process.on('SIGINT', shutdown);
+        process.on('SIGTERM', shutdown);
+      } catch (e) {
+        console.error('Failed to start server:', e);
+        process.exit(1);
+      }
+    });
+}

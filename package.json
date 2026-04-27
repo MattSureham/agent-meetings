@@ -4,9 +4,16 @@
   "description": "A framework for enabling technical meetings and communication between AI agents and LLMs",
   "main": "dist/index.js",
   "type": "module",
+  "bin": {
+    "agent-meetings": "./dist/cli/index.js",
+    "am": "./dist/cli/index.js"
+  },
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js serve",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src --ext .ts"
   },
   "keywords": [
@@ -20,8 +27,15 @@
   "author": "Matt Sureham",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.39",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
+    "vitest": "^1.6.1"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "ws": "^8.20.0",
+    "yaml": "^2.8.3"
   }
 }

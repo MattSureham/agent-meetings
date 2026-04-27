@@ -1,0 +1,63 @@
+# Agent Meetings — Example Configuration
+#
+# Copy this file to meetings.config.yml and customize.
+
+server:
+  port: 4200
+  host: "0.0.0.0"
+  dataDir: "./data"
+
+agents:
+  # Subprocess agent — spawns claude CLI per turn
+  - id: claude-code
+    name: "Claude Code"
+    type: subprocess
+    tool: claude-code
+    capabilities: [typescript, architecture, code-review, security]
+    command: claude
+    args: ["-p", "{prompt}", "--output-format", "text"]
+    timeoutMs: 120000
+
+  # Generic subprocess agent
+  - id: openclaw
+    name: "OpenClaw"
+    type: subprocess
+    tool: generic
+    capabilities: [python, data-science, ml]
+    command: openclaw
+    args: ["--prompt", "{prompt}"]
+    timeoutMs: 120000
+
+  # LLM agent — OpenAI
+  - id: gpt-4
+    name: "GPT-4"
+    type: llm
+    capabilities: [general, creative, brainstorming]
+    provider: openai
+    model: gpt-4o
+    apiKey: "${OPENAI_API_KEY}"
+
+  # LLM agent — Anthropic
+  - id: claude-sonnet
+    name: "Claude Sonnet"
+    type: llm
+    capabilities: [analysis, reasoning, writing]
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    apiKey: "${ANTHROPIC_API_KEY}"
+
+  # LLM agent — Local Ollama
+  - id: local-mistral
+    name: "Mistral (Local)"
+    type: llm
+    capabilities: [general, coding]
+    provider: ollama
+    model: mistral
+    apiKey: ""
+    endpoint: "http://127.0.0.1:11434"
+
+meetings:
+  turnTimeoutMs: 60000
+  maxRebuttalRounds: 1
+  maxDeliberationTurns: 10
+  defaultModerator: claude-sonnet
