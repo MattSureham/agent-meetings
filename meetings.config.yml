@@ -43,7 +43,7 @@ agents:
     tool: claude-code
     capabilities: [coding, building, debugging, testing, architecture]
     command: claude
-    args: ["-p", "{prompt}", "--output-format", "text"]
+    args: ["-p", "{prompt}", "--output-format", "text", "--permission-mode", "bypassPermissions", "--bare"]
     timeoutMs: 180000
 
   - id: openclaw
