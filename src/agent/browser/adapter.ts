@@ -179,14 +179,16 @@ export class BrowserAgent implements IAgent {
   }
 
   private buildPromptText(prompt: MeetingPrompt): string {
+    // Only include recent context — the full transcript is too large for web UI text boxes
+    const recentMessages = prompt.transcript.slice(-6);
     return [
       `You are "${this.name}" participating in a structured debate meeting.`,
       `MEETING TOPIC: ${prompt.topic}`,
       `BACKGROUND: ${prompt.background || 'None provided.'}`,
       `CURRENT PHASE: ${prompt.phase.toUpperCase()}`,
       '',
-      'CONVERSATION SO FAR:',
-      ...prompt.transcript.map((m) => `[${m.authorName} (${m.phase})]: ${m.content}`),
+      'RECENT CONVERSATION:',
+      ...recentMessages.map((m) => `[${m.authorName} (${m.phase})]: ${m.content}`),
       '',
       `YOUR TURN — ${prompt.currentPrompt}`,
     ].join('\n');
