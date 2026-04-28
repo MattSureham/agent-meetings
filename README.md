@@ -234,12 +234,57 @@ Each turn has a configurable timeout (`turnTimeoutMs`, default 60,000ms). If an 
 
 ### Setup
 
+**macOS / Linux:**
+
 ```bash
-git clone <repo>
+git clone https://github.com/MattSureham/agent-meetings.git
 cd agent-meetings
 npm install && npm run build
 npx playwright install chromium   # only needed for browser agents (ChatGPT, Claude Web, etc.)
 cp meetings.config.example.yml meetings.config.yml
+```
+
+**Windows (Command Prompt):**
+
+```cmd
+git clone https://github.com/MattSureham/agent-meetings.git
+cd agent-meetings
+npm install && npm run build
+npx playwright install chromium
+copy meetings.config.example.yml meetings.config.yml
+```
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/MattSureham/agent-meetings.git
+cd agent-meetings
+npm install; npm run build
+npx playwright install chromium
+Copy-Item meetings.config.example.yml meetings.config.yml
+```
+
+### Set API keys
+
+**macOS / Linux:**
+
+```bash
+export DEEPSEEK_API_KEY="sk-..."
+export OPENAI_API_KEY="sk-..."
+```
+
+**Windows (Command Prompt):**
+
+```cmd
+set DEEPSEEK_API_KEY=sk-...
+set OPENAI_API_KEY=sk-...
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:DEEPSEEK_API_KEY="sk-..."
+$env:OPENAI_API_KEY="sk-..."
 ```
 
 ### Define your agents
@@ -263,11 +308,6 @@ agents:
     provider: minimax
     model: abab6.5s-chat
     apiKey: "${MINIMAX_API_KEY}"
-```
-
-```bash
-export DEEPSEEK_API_KEY=sk-...
-export MINIMAX_API_KEY=...
 ```
 
 ### Run a meeting (one command)
