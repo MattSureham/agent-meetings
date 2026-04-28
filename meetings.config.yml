@@ -73,6 +73,22 @@ agents:
     model: deepseek-reasoner
     apiKey: "${DEEPSEEK_API_KEY}"
 
+  - id: deepseek-v4-pro
+    name: "DeepSeek V4 Pro"
+    type: llm
+    capabilities: [architecture, planning, coding, analysis, reasoning]
+    provider: deepseek
+    model: deepseek-v4-pro
+    apiKey: "${DEEPSEEK_API_KEY}"
+
+  - id: deepseek-v4-flash
+    name: "DeepSeek V4 Flash"
+    type: llm
+    capabilities: [coding, brainstorming, iteration]
+    provider: deepseek
+    model: deepseek-v4-flash
+    apiKey: "${DEEPSEEK_API_KEY}"
+
   - id: minimax
     name: "MiniMax"
     type: llm
