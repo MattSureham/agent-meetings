@@ -7,5 +7,4 @@ export const claudeSite: SiteConfig = {
   responseSelector: '.font-claude-message',
   waitStrategy: 'stop-button',
   stopButtonSelector: 'button[aria-label="Stop"]',
-  newChatUrl: 'https://claude.ai/new',
 };

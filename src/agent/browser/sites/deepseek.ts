@@ -6,6 +6,5 @@ export const deepseekSite: SiteConfig = {
   inputSelector: 'textarea',
   responseSelector: '.ds-markdown',
   waitStrategy: 'stop-button',
-  stopButtonSelector: 'button:has(svg)',    // deepseek's stop/abort button
-  newChatUrl: 'https://chat.deepseek.com',
+  stopButtonSelector: 'button:has(svg)',
 };

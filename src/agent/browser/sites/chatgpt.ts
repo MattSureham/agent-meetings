@@ -7,5 +7,4 @@ export const chatgptSite: SiteConfig = {
   responseSelector: '[data-message-author-role="assistant"]',
   waitStrategy: 'stop-button',
   stopButtonSelector: 'button[data-testid="stop-button"]',
-  newChatUrl: 'https://chatgpt.com/?model=gpt-4o',
 };

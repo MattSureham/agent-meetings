@@ -7,5 +7,4 @@ export const geminiSite: SiteConfig = {
   responseSelector: '.model-response-text',
   waitStrategy: 'typing-indicator',
   typingIndicatorSelector: '.typing-indicator, .loading',
-  newChatUrl: 'https://gemini.google.com/app',
 };
