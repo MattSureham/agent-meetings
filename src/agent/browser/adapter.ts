@@ -40,6 +40,11 @@ export class BrowserAgent implements IAgent {
     this.timeoutMs = config.timeoutMs ?? 120_000;
   }
 
+  async open(): Promise<void> {
+    await this.getPage();
+    await this.page!.goto(this.site.url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  }
+
   async respond(prompt: MeetingPrompt): Promise<AgentResponse> {
     try {
       const page = await this.getPage();
