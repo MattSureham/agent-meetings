@@ -153,6 +153,7 @@ export class AgentRegistry {
     } else {
       adapter = this.buildLLMAdapter(def.provider, def.model, def.apiKey, def.endpoint);
       this.llmAdapterCache.set(cacheKey, adapter);
+      this.llmAdapterCache.set(def.id, adapter);
     }
 
     return new LLMAgent(def.id, def.name, def.capabilities, adapter);
