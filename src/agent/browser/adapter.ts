@@ -132,7 +132,11 @@ export class BrowserAgent implements IAgent {
       const userDataDir = join(homedir(), '.agent-meetings', 'browser', this.id);
       this.context = await chromium.launchPersistentContext(userDataDir, {
         headless: false,
-        args: ['--no-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
+        ],
         viewport: { width: 1280, height: 900 },
       });
     }
