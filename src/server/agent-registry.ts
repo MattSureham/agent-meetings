@@ -3,6 +3,7 @@ import type { LLMAdapter } from '../llm/types.js';
 import type { Config, AgentDef, SubprocessAgentDef, LLMAgentDef, BrowserAgentDef } from '../config/types.js';
 import type { DataStore, StoredAgent } from '../persistence/types.js';
 import { SubprocessAgent } from '../agent/subprocess/adapter.js';
+import { parseOpenClawOutput } from '../agent/subprocess/integrations/generic.js';
 import { LLMAgent } from '../llm/agent.js';
 import { AnthropicAdapter } from '../llm/anthropic.js';
 import { OpenAIAdapter } from '../llm/openai.js';
@@ -126,6 +127,7 @@ export class AgentRegistry {
       cwd: def.cwd,
       timeoutMs: def.timeoutMs,
       promptMode: def.args.some((a) => a.includes('{prompt}')) ? 'argument' : 'stdin',
+      parseOutput: def.command === 'openclaw' ? parseOpenClawOutput : undefined,
     });
   }
 

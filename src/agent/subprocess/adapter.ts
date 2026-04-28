@@ -16,6 +16,7 @@ export interface SubprocessAgentConfig {
   promptMode: 'argument' | 'stdin' | 'file';
   buildArgs?: (prompt: MeetingPrompt) => string[];
   buildInput?: (prompt: MeetingPrompt) => string;
+  parseOutput?: (stdout: string) => string;
 }
 
 export class SubprocessAgent implements IAgent {
@@ -57,6 +58,14 @@ export class SubprocessAgent implements IAgent {
     });
   }
 
+  private formatOutput(stdout: string, stderr: string): string {
+    const raw = stdout || stderr || `[${this.name} produced no output]`;
+    if (stdout && this.config.parseOutput) {
+      return this.config.parseOutput(stdout);
+    }
+    return raw;
+  }
+
   private async respondViaArgs(prompt: MeetingPrompt): Promise<AgentResponse> {
     const promptText = this.buildPromptText(prompt);
     const args = this.replaceTokens(this.config.args, prompt, promptText);
@@ -72,7 +81,7 @@ export class SubprocessAgent implements IAgent {
     if (result.timedOut) {
       return { content: `[${this.name} did not respond within the time limit]` };
     }
-    return { content: result.stdout || result.stderr || `[${this.name} produced no output]` };
+    return { content: this.formatOutput(result.stdout, result.stderr) };
   }
 
   private async respondViaStdin(prompt: MeetingPrompt, promptText: string): Promise<AgentResponse> {
@@ -89,7 +98,7 @@ export class SubprocessAgent implements IAgent {
     if (result.timedOut) {
       return { content: `[${this.name} did not respond within the time limit]` };
     }
-    return { content: result.stdout || result.stderr || `[${this.name} produced no output]` };
+    return { content: this.formatOutput(result.stdout, result.stderr) };
   }
 
   private async respondViaFile(prompt: MeetingPrompt, promptText: string): Promise<AgentResponse> {
@@ -112,7 +121,7 @@ export class SubprocessAgent implements IAgent {
       if (result.timedOut) {
         return { content: `[${this.name} did not respond within the time limit]` };
       }
-      return { content: result.stdout || result.stderr || `[${this.name} produced no output]` };
+      return { content: this.formatOutput(result.stdout, result.stderr) };
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
