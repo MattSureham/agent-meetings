@@ -38,19 +38,28 @@ export class SubprocessAgent implements IAgent {
     const promptText = this.buildPromptText(prompt);
 
     if (this.config.promptMode === 'file') {
-      return this.respondViaFile(promptText);
+      return this.respondViaFile(prompt, promptText);
     }
     if (this.config.promptMode === 'stdin') {
-      return this.respondViaStdin(promptText);
+      return this.respondViaStdin(prompt, promptText);
     }
     return this.respondViaArgs(prompt);
   }
 
+  private replaceTokens(args: string[], prompt: MeetingPrompt, promptText: string, filePath?: string): string[] {
+    return args.map((a) => {
+      let result = a;
+      if (result === '{prompt}') result = promptText;
+      else result = result.replace('{prompt}', promptText);
+      result = result.replace('{meetingId}', prompt.meetingId);
+      if (filePath) result = result.replace('{file}', filePath);
+      return result;
+    });
+  }
+
   private async respondViaArgs(prompt: MeetingPrompt): Promise<AgentResponse> {
     const promptText = this.buildPromptText(prompt);
-    const args = this.config.args.map((a) =>
-      a === '{prompt}' ? promptText : a.replace('{prompt}', promptText)
-    );
+    const args = this.replaceTokens(this.config.args, prompt, promptText);
 
     const result = await this.manager.run({
       command: this.config.command,
@@ -66,10 +75,11 @@ export class SubprocessAgent implements IAgent {
     return { content: result.stdout || result.stderr || `[${this.name} produced no output]` };
   }
 
-  private async respondViaStdin(promptText: string): Promise<AgentResponse> {
+  private async respondViaStdin(prompt: MeetingPrompt, promptText: string): Promise<AgentResponse> {
+    const args = this.replaceTokens(this.config.args, prompt, promptText);
     const result = await this.manager.run({
       command: this.config.command,
-      args: this.config.args,
+      args,
       cwd: this.config.cwd,
       env: this.config.env,
       timeoutMs: this.config.timeoutMs,
@@ -82,16 +92,14 @@ export class SubprocessAgent implements IAgent {
     return { content: result.stdout || result.stderr || `[${this.name} produced no output]` };
   }
 
-  private async respondViaFile(promptText: string): Promise<AgentResponse> {
+  private async respondViaFile(prompt: MeetingPrompt, promptText: string): Promise<AgentResponse> {
     const dir = await mkdtemp(join(tmpdir(), 'agent-meeting-'));
     const filePath = join(dir, 'prompt.txt');
 
     try {
       await writeFile(filePath, promptText, 'utf-8');
 
-      const args = this.config.args.map((a) =>
-        a === '{prompt}' ? promptText : a.replace('{prompt}', promptText).replace('{file}', filePath)
-      );
+      const args = this.replaceTokens(this.config.args, prompt, promptText, filePath);
 
       const result = await this.manager.run({
         command: this.config.command,

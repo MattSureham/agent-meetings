@@ -52,7 +52,7 @@ agents:
     tool: generic
     capabilities: [coding, building, scripting, automation]
     command: openclaw
-    args: ["agent", "--local", "--json", "-m", "{prompt}"]
+    args: ["agent", "--local", "--json", "--session-id", "{meetingId}", "-m", "{prompt}"]
     timeoutMs: 180000
 
   # ── Thinkers (LLM API — reasoning, planning, creative) ──
