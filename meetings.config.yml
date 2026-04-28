@@ -65,6 +65,14 @@ agents:
     model: deepseek-chat
     apiKey: "${DEEPSEEK_API_KEY}"
 
+  - id: deepseek-reasoner
+    name: "DeepSeek Reasoner"
+    type: llm
+    capabilities: [architecture, planning, reasoning, analysis]
+    provider: deepseek
+    model: deepseek-reasoner
+    apiKey: "${DEEPSEEK_API_KEY}"
+
   - id: minimax
     name: "MiniMax"
     type: llm
