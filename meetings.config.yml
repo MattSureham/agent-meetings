@@ -55,6 +55,16 @@ agents:
     args: ["agent", "--local", "--json", "--session-id", "{meetingId}", "-m", "{prompt}"]
     timeoutMs: 1800000
 
+  - id: hermes
+    name: "Hermes"
+    type: subprocess
+    tool: generic
+    capabilities: [coding, building, debugging, architecture]
+    command: /Users/matthew/hermes-agent/venv/bin/python
+    args: ["run_agent.py", "-q", "{prompt}", "--max_turns", "15", "-e", "development"]
+    cwd: /Users/matthew/hermes-agent
+    timeoutMs: 1800000
+
   # ── Thinkers (LLM API — reasoning, planning, creative) ──
 
   - id: deepseek
