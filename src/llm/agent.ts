@@ -39,7 +39,7 @@ export class LLMAgent implements IAgent {
 
   private buildSystemPrompt(prompt: MeetingPrompt): string {
     return [
-      `You are "${this.name}", an AI agent participating in a structured debate meeting.`,
+      `You are "${this.name}", an AI agent participating in a structured meeting.`,
       `Meeting topic: "${prompt.topic}"`,
       `Background context: ${prompt.background || 'None provided.'}`,
       `Current phase: ${prompt.phase.toUpperCase()}`,
@@ -55,7 +55,7 @@ export class LLMAgent implements IAgent {
   private phaseInstructions(phase: DebatePhase): string {
     switch (phase) {
       case 'opening':
-        return 'The moderator is introducing the topic. Listen and prepare your initial position.';
+        return 'The moderator is introducing the topic. Listen and prepare your initial thoughts.';
       case 'position':
         return 'State your position on the topic clearly. Explain your reasoning and what evidence or principles support your view.';
       case 'rebuttal':
@@ -64,6 +64,12 @@ export class LLMAgent implements IAgent {
         return 'Free-form discussion. Raise points you think are important, respond to others, and work toward consensus. If you have nothing new to add, you may pass.';
       case 'voting':
         return 'Cast your vote on the question presented. State your vote clearly and briefly justify it.';
+      case 'plan':
+        return 'Propose your architectural approach and how you would divide the work. Be specific about components, modules, and responsibilities.';
+      case 'build':
+        return 'The builders are implementing now. You are an advisor — provide feedback, guidance, and suggestions. Do NOT emit tool calls or code blocks pretending to execute commands; you are text-only.';
+      case 'review':
+        return 'Review what the team has built. What works well? What needs improvement? What should happen next? Be constructive and specific.';
       case 'summary':
         return 'The meeting is concluding. The moderator will summarize.';
       case 'concluded':
@@ -76,7 +82,11 @@ export class LLMAgent implements IAgent {
   private transcriptToMessages(
     transcript: MeetingPrompt['transcript']
   ): ChatMessage[] {
-    return transcript.map((msg) => ({
+    const maxMessages = 12;
+    const recent = transcript.length > maxMessages
+      ? transcript.slice(-maxMessages)
+      : transcript;
+    return recent.map((msg) => ({
       role: msg.authorId === this.id ? ('assistant' as const) : ('user' as const),
       content: `[${msg.authorName}]: ${msg.content}`,
     }));

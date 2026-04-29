@@ -36,7 +36,7 @@ agents:
     timeoutMs: 120000
 
   # ── Builders (subprocess — these can write code, run commands, create files) ──
-ﬁ
+
   - id: claude-code
     name: "Claude Code"
     type: subprocess
@@ -44,7 +44,7 @@ agents:
     capabilities: [coding, building, debugging, testing, architecture]
     command: claude
     args: ["-p", "{prompt}", "--output-format", "text", "--permission-mode", "bypassPermissions", "--bare"]
-    timeoutMs: 600000
+    timeoutMs: 1800000
 
   - id: openclaw
     name: "OpenClaw"
@@ -53,7 +53,7 @@ agents:
     capabilities: [coding, building, scripting, automation]
     command: openclaw
     args: ["agent", "--local", "--json", "--session-id", "{meetingId}", "-m", "{prompt}"]
-    timeoutMs: 180000
+    timeoutMs: 1800000
 
   # ── Thinkers (LLM API — reasoning, planning, creative) ──
 

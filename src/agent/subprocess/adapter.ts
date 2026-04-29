@@ -145,14 +145,28 @@ export class SubprocessAgent implements IAgent {
   }
 
   private buildPromptText(prompt: MeetingPrompt): string {
+    const maxMessages = 8;
+    const transcript = prompt.transcript;
+    let transcriptLines: string[];
+
+    if (transcript.length <= maxMessages) {
+      transcriptLines = transcript.map((m) => `[${m.authorName} (${m.phase})]: ${m.content}`);
+    } else {
+      const recent = transcript.slice(-maxMessages);
+      transcriptLines = [
+        `[Showing last ${maxMessages} of ${transcript.length} total messages]`,
+        ...recent.map((m) => `[${m.authorName} (${m.phase})]: ${m.content}`),
+      ];
+    }
+
     return [
-      `You are "${this.name}" participating in a structured debate meeting.`,
+      `You are "${this.name}" participating in a structured meeting.`,
       `MEETING TOPIC: ${prompt.topic}`,
       `BACKGROUND: ${prompt.background || 'None provided.'}`,
       `CURRENT PHASE: ${prompt.phase.toUpperCase()}`,
       '',
       'CONVERSATION SO FAR:',
-      ...prompt.transcript.map((m) => `[${m.authorName} (${m.phase})]: ${m.content}`),
+      ...transcriptLines,
       '',
       `YOUR TURN — ${prompt.currentPrompt}`,
     ].join('\n');

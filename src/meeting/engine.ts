@@ -223,7 +223,21 @@ export class MeetingEngine {
   }
 
   private async runRoundRobin(phase: MeetingPhase): Promise<void> {
-    const participants = [...this.agents.values()];
+    let participants = [...this.agents.values()];
+
+    // BUILD phase: only subprocess agents can actually execute tools
+    if (phase === MeetingPhase.BUILD) {
+      participants = participants.filter((a) => a.type === 'subprocess');
+      if (participants.length === 0) {
+        this.addMessage(
+          '__system_moderator__',
+          'Moderator',
+          'No builder agents available for BUILD phase. Skipping.'
+        );
+        return;
+      }
+    }
+
     this.turnManager.setRound(participants);
 
     while (!this.turnManager.allSpoken()) {
