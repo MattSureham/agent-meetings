@@ -13,28 +13,41 @@ export class Summarizer {
     topic: string,
     context: string,
     transcript: { authorName: string; content: string }[],
-    participants: IAgent[]
+    participants: IAgent[],
+    mode: 'debate' | 'collaboration' = 'debate'
   ): Promise<MeetingSummary> {
     if (this.adapter) {
-      return this.llmSummary(topic, context, transcript, participants);
+      return this.llmSummary(topic, context, transcript, participants, mode);
     }
-    return this.fallbackSummary(participants);
+    return this.fallbackSummary(participants, mode);
   }
 
   private async llmSummary(
     topic: string,
     context: string,
     transcript: { authorName: string; content: string }[],
-    participants: IAgent[]
+    participants: IAgent[],
+    mode: 'debate' | 'collaboration'
   ): Promise<MeetingSummary> {
     const transcriptText = transcript
       .map((m) => `[${m.authorName}]: ${m.content}`)
       .join('\n\n');
 
-    const response = await this.adapter!.chat([
-      {
-        role: 'system',
-        content: [
+    const isCollab = mode === 'collaboration';
+
+    const systemPrompt = isCollab
+      ? [
+          'You produce structured project summaries in JSON format.',
+          'Output ONLY valid JSON matching this schema:',
+          '{',
+          '  "consensus": "string — overall project outcome and what was accomplished",',
+          '  "keyPoints": ["string — main discussion points and findings"],',
+          '  "actionItems": ["string — concrete next steps"],',
+          '  "deliverables": ["string — what was actually built or produced"],',
+          '  "decisions": ["string — key technical and design decisions made"]',
+          '}',
+        ].join('\n')
+      : [
           'You produce structured meeting summaries in JSON format.',
           'Output ONLY valid JSON matching this schema:',
           '{',
@@ -43,8 +56,10 @@ export class Summarizer {
           '  "dissentingViews": ["string — minority or opposing opinions"],',
           '  "actionItems": ["string — concrete follow-up tasks"]',
           '}',
-        ].join('\n'),
-      },
+        ].join('\n');
+
+    const response = await this.adapter!.chat([
+      { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: [
@@ -55,19 +70,22 @@ export class Summarizer {
           'TRANSCRIPT:',
           transcriptText,
           '',
-          'Produce the meeting summary as JSON.',
+          isCollab ? 'Produce the project summary as JSON.' : 'Produce the meeting summary as JSON.',
         ].join('\n'),
       },
     ]);
 
     try {
       const json = JSON.parse(response.replace(/```json\n?|\n?```/g, '').trim());
-      return {
-        consensus: json.consensus ?? 'No consensus recorded.',
+      const summary: MeetingSummary = {
+        consensus: json.consensus ?? (isCollab ? 'Project completed.' : 'No consensus recorded.'),
         keyPoints: json.keyPoints ?? [],
         dissentingViews: json.dissentingViews ?? [],
         actionItems: json.actionItems ?? [],
+        deliverables: json.deliverables,
+        decisions: json.decisions,
       };
+      return summary;
     } catch {
       return {
         consensus: response.slice(0, 500),
@@ -78,9 +96,11 @@ export class Summarizer {
     }
   }
 
-  private fallbackSummary(participants: IAgent[]): MeetingSummary {
+  private fallbackSummary(participants: IAgent[], mode: 'debate' | 'collaboration' = 'debate'): MeetingSummary {
     return {
-      consensus: 'Meeting concluded (no LLM available for automated summary).',
+      consensus: mode === 'collaboration'
+        ? 'Project completed (no LLM available for automated summary).'
+        : 'Meeting concluded (no LLM available for automated summary).',
       keyPoints: [],
       dissentingViews: [],
       actionItems: [],

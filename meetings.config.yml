@@ -36,7 +36,7 @@ agents:
     timeoutMs: 120000
 
   # ── Builders (subprocess — these can write code, run commands, create files) ──
-
+ﬁ
   - id: claude-code
     name: "Claude Code"
     type: subprocess
@@ -98,6 +98,7 @@ agents:
     apiKey: "${MINIMAX_API_KEY}"
 
 meetings:
+  mode: debate
   turnTimeoutMs: 60000
   maxRebuttalRounds: 1
   maxDeliberationTurns: 10

@@ -2,8 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { IAgent, TranscriptMessage } from '../agent/types.js';
 import type { LLMAdapter } from '../llm/types.js';
 import {
-  DebatePhase,
-  PHASE_TRANSITIONS,
+  MeetingPhase,
   type MeetingStatus,
   type Message,
   type PhaseTransition,
@@ -19,6 +18,8 @@ export interface MeetingConfig {
   context: string;
   participants: IAgent[];
   moderatorId?: string;
+  mode?: 'debate' | 'collaboration';
+  workDir?: string;
   turnTimeoutMs?: number;
   maxRebuttalRounds?: number;
   maxDeliberationTurns?: number;
@@ -34,9 +35,10 @@ export class MeetingEngine {
   readonly context: string;
   readonly participantIds: string[];
   readonly moderatorId: string;
+  readonly mode: 'debate' | 'collaboration';
 
   status: MeetingStatus = 'pending';
-  currentPhase: DebatePhase = DebatePhase.OPENING;
+  currentPhase: MeetingPhase = MeetingPhase.OPENING;
   transcript: Message[] = [];
   phaseTimeline: PhaseTransition[] = [];
   summary: MeetingSummary | null = null;
@@ -61,6 +63,7 @@ export class MeetingEngine {
     this.topic = config.topic;
     this.context = config.context;
     this.moderatorId = config.moderatorId ?? '__system_moderator__';
+    this.mode = config.mode ?? 'debate';
     this.turnTimeoutMs = config.turnTimeoutMs ?? 60_000;
     this.maxRebuttalRounds = config.maxRebuttalRounds ?? 1;
     this.maxDeliberationTurns = config.maxDeliberationTurns ?? 10;
@@ -70,7 +73,7 @@ export class MeetingEngine {
 
     this.agents = new Map(config.participants.map((a) => [a.id, a]));
     this.turnManager = new TurnManager();
-    this.moderator = new Moderator(config.defaultLLM ?? null);
+    this.moderator = new Moderator(config.defaultLLM ?? null, this.mode, config.workDir ?? null);
     this.summarizer = new Summarizer(config.defaultLLM ?? null);
     this.onTurnStart = config.onTurnStart;
     this.onTurnEnd = config.onTurnEnd;
@@ -92,20 +95,38 @@ export class MeetingEngine {
 
   async start(): Promise<void> {
     this.status = 'active';
-    await this.advancePhase(DebatePhase.OPENING);
+
+    if (this.mode === 'collaboration') {
+      await this.runCollaboration();
+    } else {
+      await this.runDebate();
+    }
+
+    if (this.aborted) return;
+
+    await this.advancePhase(MeetingPhase.SUMMARY);
+    await this.runSummary();
+    await this.advancePhase(MeetingPhase.CONCLUDED);
+
+    this.status = 'concluded';
+    this.concludedAt = Date.now();
+  }
+
+  private async runDebate(): Promise<void> {
+    await this.advancePhase(MeetingPhase.OPENING);
     await this.runOpening();
     if (this.aborted) return;
 
     if (!this.turnLimitReached) {
-      await this.advancePhase(DebatePhase.POSITION);
-      await this.runRoundRobin(DebatePhase.POSITION);
+      await this.advancePhase(MeetingPhase.POSITION);
+      await this.runRoundRobin(MeetingPhase.POSITION);
     }
     if (this.aborted) return;
 
     if (!this.turnLimitReached) {
       for (let r = 0; r < this.maxRebuttalRounds; r++) {
-        await this.advancePhase(DebatePhase.REBUTTAL);
-        await this.runRoundRobin(DebatePhase.REBUTTAL);
+        await this.advancePhase(MeetingPhase.REBUTTAL);
+        await this.runRoundRobin(MeetingPhase.REBUTTAL);
         if (this.aborted || this.turnLimitReached) break;
         this.turnManager.resetRound();
       }
@@ -113,23 +134,38 @@ export class MeetingEngine {
     if (this.aborted) return;
 
     if (!this.turnLimitReached) {
-      await this.advancePhase(DebatePhase.DELIBERATION);
+      await this.advancePhase(MeetingPhase.DELIBERATION);
       await this.runDeliberation();
     }
     if (this.aborted) return;
 
     if (!this.turnLimitReached) {
-      await this.advancePhase(DebatePhase.VOTING);
+      await this.advancePhase(MeetingPhase.VOTING);
       await this.runVoting();
+    }
+  }
+
+  private async runCollaboration(): Promise<void> {
+    await this.advancePhase(MeetingPhase.OPENING);
+    await this.runOpening();
+    if (this.aborted) return;
+
+    if (!this.turnLimitReached) {
+      await this.advancePhase(MeetingPhase.PLAN);
+      await this.runRoundRobin(MeetingPhase.PLAN);
     }
     if (this.aborted) return;
 
-    await this.advancePhase(DebatePhase.SUMMARY);
-    await this.runSummary();
-    await this.advancePhase(DebatePhase.CONCLUDED);
+    if (!this.turnLimitReached) {
+      await this.advancePhase(MeetingPhase.BUILD);
+      await this.runRoundRobin(MeetingPhase.BUILD);
+    }
+    if (this.aborted) return;
 
-    this.status = 'concluded';
-    this.concludedAt = Date.now();
+    if (!this.turnLimitReached) {
+      await this.advancePhase(MeetingPhase.REVIEW);
+      await this.runRoundRobin(MeetingPhase.REVIEW);
+    }
   }
 
   cancel(): void {
@@ -151,6 +187,7 @@ export class MeetingEngine {
       topic: this.topic,
       context: this.context,
       status: this.status,
+      mode: this.mode,
       participantIds: this.participantIds,
       moderatorId: this.moderatorId,
       transcript: this.transcript,
@@ -161,7 +198,7 @@ export class MeetingEngine {
     };
   }
 
-  private async advancePhase(phase: DebatePhase): Promise<void> {
+  private async advancePhase(phase: MeetingPhase): Promise<void> {
     if (this.phaseTimeline.length > 0) {
       const current = this.phaseTimeline[this.phaseTimeline.length - 1];
       if (current.exitedAt === null) {
@@ -185,7 +222,7 @@ export class MeetingEngine {
     this.addMessage(this.moderator.systemModeratorId, this.moderator.systemModeratorName, openingText);
   }
 
-  private async runRoundRobin(phase: DebatePhase): Promise<void> {
+  private async runRoundRobin(phase: MeetingPhase): Promise<void> {
     const participants = [...this.agents.values()];
     this.turnManager.setRound(participants);
 
@@ -198,10 +235,18 @@ export class MeetingEngine {
       const agent = this.agents.get(speaker.id);
       if (!agent) continue;
 
-      const currentPrompt =
-        phase === DebatePhase.POSITION
-          ? this.moderator.buildPositionPrompt(this.topic, speaker.name)
-          : this.moderator.buildRebuttalPrompt(this.topic, speaker.name);
+      let currentPrompt: string;
+      if (phase === MeetingPhase.POSITION) {
+        currentPrompt = this.moderator.buildPositionPrompt(this.topic, speaker.name);
+      } else if (phase === MeetingPhase.REBUTTAL) {
+        currentPrompt = this.moderator.buildRebuttalPrompt(this.topic, speaker.name);
+      } else if (phase === MeetingPhase.PLAN) {
+        currentPrompt = this.moderator.buildPlanPrompt(this.topic, speaker.name);
+      } else if (phase === MeetingPhase.BUILD) {
+        currentPrompt = this.moderator.buildBuildPrompt(this.topic, speaker.name);
+      } else {
+        currentPrompt = this.moderator.buildReviewPrompt(this.topic, speaker.name);
+      }
 
       await this.promptAgent(agent, currentPrompt);
 
@@ -288,38 +333,60 @@ export class MeetingEngine {
         authorName: m.authorName,
         content: m.content,
       })),
-      [...this.agents.values()]
+      [...this.agents.values()],
+      this.mode
     );
 
-    const voteTally = this.summarizer.parseVotes(
-      this.transcript
-        .filter((m) => m.phase === DebatePhase.VOTING)
-        .map((m) => ({ authorName: m.authorName, content: m.content }))
-    );
-
-    summary.voteTally = voteTally;
+    if (this.mode !== 'collaboration') {
+      const voteTally = this.summarizer.parseVotes(
+        this.transcript
+          .filter((m) => m.phase === MeetingPhase.VOTING)
+          .map((m) => ({ authorName: m.authorName, content: m.content }))
+      );
+      summary.voteTally = voteTally;
+    }
     this.summary = summary;
 
-    const summaryText = [
-      `=== MEETING SUMMARY ===`,
+    const heading = this.mode === 'collaboration' ? 'PROJECT SUMMARY' : 'MEETING SUMMARY';
+    const lines: string[] = [
+      `=== ${heading} ===`,
       `Topic: ${this.topic}`,
       `Consensus: ${summary.consensus}`,
       '',
       'Key Points:',
       ...summary.keyPoints.map((p) => `  • ${p}`),
-      '',
-      'Dissenting Views:',
-      ...(summary.dissentingViews.length > 0
-        ? summary.dissentingViews.map((v) => `  • ${v}`)
-        : ['  (none)']),
+    ];
+
+    if (this.mode === 'collaboration') {
+      if (summary.deliverables && summary.deliverables.length > 0) {
+        lines.push('', 'Deliverables:', ...summary.deliverables.map((d) => `  • ${d}`));
+      }
+      if (summary.decisions && summary.decisions.length > 0) {
+        lines.push('', 'Key Decisions:', ...summary.decisions.map((d) => `  • ${d}`));
+      }
+    } else {
+      lines.push(
+        '',
+        'Dissenting Views:',
+        ...(summary.dissentingViews.length > 0
+          ? summary.dissentingViews.map((v) => `  • ${v}`)
+          : ['  (none)'])
+      );
+      if (summary.voteTally) {
+        const t = summary.voteTally;
+        lines.push('', `Vote Tally: YES=${t.yes} NO=${t.no} ABSTAIN=${t.abstain}`);
+      }
+    }
+
+    lines.push(
       '',
       'Action Items:',
       ...(summary.actionItems.length > 0
         ? summary.actionItems.map((a) => `  • ${a}`)
-        : ['  (none)']),
-      '',
-      voteTally ? `Vote Tally: YES=${voteTally.yes} NO=${voteTally.no} ABSTAIN=${voteTally.abstain}` : '',
-    ].join('\n');
+        : ['  (none)'])
+    );
+
+    const summaryText = lines.join('\n');
 
     this.addMessage(this.moderator.systemModeratorId, this.moderator.systemModeratorName, summaryText);
   }

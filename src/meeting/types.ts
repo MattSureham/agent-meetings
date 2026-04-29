@@ -1,22 +1,22 @@
-export enum DebatePhase {
+export enum MeetingPhase {
+  // Debate phases
   OPENING = 'opening',
   POSITION = 'position',
   REBUTTAL = 'rebuttal',
   DELIBERATION = 'deliberation',
   VOTING = 'voting',
+  // Collaboration phases
+  PLAN = 'plan',
+  BUILD = 'build',
+  REVIEW = 'review',
+  // Shared
   SUMMARY = 'summary',
   CONCLUDED = 'concluded',
 }
 
-export const PHASE_TRANSITIONS: Record<DebatePhase, DebatePhase[]> = {
-  [DebatePhase.OPENING]: [DebatePhase.POSITION],
-  [DebatePhase.POSITION]: [DebatePhase.REBUTTAL],
-  [DebatePhase.REBUTTAL]: [DebatePhase.DELIBERATION, DebatePhase.VOTING],
-  [DebatePhase.DELIBERATION]: [DebatePhase.VOTING, DebatePhase.SUMMARY],
-  [DebatePhase.VOTING]: [DebatePhase.SUMMARY],
-  [DebatePhase.SUMMARY]: [DebatePhase.CONCLUDED],
-  [DebatePhase.CONCLUDED]: [],
-};
+/** @deprecated Use MeetingPhase */
+export const DebatePhase = MeetingPhase;
+export type DebatePhase = MeetingPhase;
 
 export type MeetingStatus = 'pending' | 'active' | 'concluded' | 'cancelled';
 
@@ -25,12 +25,12 @@ export interface Message {
   authorId: string;
   authorName: string;
   content: string;
-  phase: DebatePhase;
+  phase: MeetingPhase;
   timestamp: number;
 }
 
 export interface PhaseTransition {
-  phase: DebatePhase;
+  phase: MeetingPhase;
   enteredAt: number;
   exitedAt: number | null;
 }
@@ -41,6 +41,8 @@ export interface MeetingSummary {
   dissentingViews: string[];
   actionItems: string[];
   voteTally?: Record<string, number>;
+  deliverables?: string[];
+  decisions?: string[];
 }
 
 export interface StoredMeeting {
@@ -48,6 +50,7 @@ export interface StoredMeeting {
   topic: string;
   context: string;
   status: MeetingStatus;
+  mode: string;
   participantIds: string[];
   moderatorId: string;
   transcript: Message[];

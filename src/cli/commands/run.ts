@@ -19,6 +19,8 @@ export function runCommand(): Command {
     .option('--rebuttal-rounds <n>', 'Max rebuttal rounds', '1')
     .option('--deliberation-turns <n>', 'Max deliberation turns', '10')
     .option('--max-turns <n>', 'Maximum total turns before forcing conclusion', '50')
+    .option('--mode <mode>', 'Meeting mode: debate or collaboration', 'debate')
+    .option('--work-dir <path>', 'Shared working directory for agents to build in (collaboration mode)')
     .option('--no-stream', 'Do not stream transcript; only show summary at the end')
     .action(async (options) => {
       let config;
@@ -78,11 +80,15 @@ export function runCommand(): Command {
       const store = new JsonFileStore(config.server.dataDir);
       await store.init();
 
+      const mode = (options.mode as string) ?? config.meetings.mode ?? 'debate';
+
       const engine = new MeetingEngine({
         topic: options.topic,
         context,
         participants,
         moderatorId,
+        mode: mode as 'debate' | 'collaboration',
+        workDir: options.workDir,
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
         maxRebuttalRounds: parseInt(options.rebuttalRounds, 10),
         maxDeliberationTurns: parseInt(options.deliberationTurns, 10),
@@ -106,6 +112,9 @@ export function runCommand(): Command {
         rebuttal: 'REBUTTAL — agents respond to each other',
         deliberation: 'DELIBERATION — free-form discussion',
         voting: 'VOTING — casting votes',
+        plan: 'PLAN — agents propose approach',
+        build: 'BUILD — agents implement',
+        review: 'REVIEW — agents review output',
         summary: 'SUMMARY — final recap',
         concluded: 'CONCLUDED',
       };
@@ -166,34 +175,52 @@ export function runCommand(): Command {
 
       // Summary
       if (engine.summary) {
+        const isCollab = engine.mode === 'collaboration';
         console.log('═══════════════════════════════════════════════');
-        console.log('              MEETING SUMMARY');
+        console.log(isCollab ? '              PROJECT SUMMARY' : '              MEETING SUMMARY');
         console.log('═══════════════════════════════════════════════');
         console.log();
-        console.log(`Consensus: ${engine.summary.consensus}`);
+        console.log(`Outcome: ${engine.summary.consensus}`);
         console.log();
         console.log('Key Points:');
         for (const p of engine.summary.keyPoints) {
           console.log(`  • ${p}`);
         }
         console.log();
-        if (engine.summary.dissentingViews.length > 0) {
-          console.log('Dissenting Views:');
-          for (const v of engine.summary.dissentingViews) {
-            console.log(`  • ${v}`);
+        if (isCollab) {
+          if (engine.summary.deliverables && engine.summary.deliverables.length > 0) {
+            console.log('Deliverables:');
+            for (const d of engine.summary.deliverables) {
+              console.log(`  • ${d}`);
+            }
+            console.log();
           }
-          console.log();
+          if (engine.summary.decisions && engine.summary.decisions.length > 0) {
+            console.log('Key Decisions:');
+            for (const d of engine.summary.decisions) {
+              console.log(`  • ${d}`);
+            }
+            console.log();
+          }
+        } else {
+          if (engine.summary.dissentingViews.length > 0) {
+            console.log('Dissenting Views:');
+            for (const v of engine.summary.dissentingViews) {
+              console.log(`  • ${v}`);
+            }
+            console.log();
+          }
+          if (engine.summary.voteTally) {
+            const t = engine.summary.voteTally;
+            console.log(`Vote: YES=${t.yes ?? 0}  NO=${t.no ?? 0}  ABSTAIN=${t.abstain ?? 0}`);
+            console.log();
+          }
         }
         if (engine.summary.actionItems.length > 0) {
           console.log('Action Items:');
           for (const a of engine.summary.actionItems) {
             console.log(`  • ${a}`);
           }
-          console.log();
-        }
-        if (engine.summary.voteTally) {
-          const t = engine.summary.voteTally;
-          console.log(`Vote: YES=${t.yes ?? 0}  NO=${t.no ?? 0}  ABSTAIN=${t.abstain ?? 0}`);
           console.log();
         }
       }
@@ -230,6 +257,9 @@ function formatLog(engine: MeetingEngine): string {
     rebuttal: '═══ REBUTTALS ═══',
     deliberation: '═══ DELIBERATION ═══',
     voting: '═══ VOTING ═══',
+    plan: '═══ PLANNING ═══',
+    build: '═══ BUILD ═══',
+    review: '═══ REVIEW ═══',
     summary: '═══ SUMMARY ═══',
     concluded: '═══ CONCLUDED ═══',
   };

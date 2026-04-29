@@ -20,8 +20,8 @@ export {
   MeetingConfig,
 } from './meeting/engine.js';
 export {
+  MeetingPhase,
   DebatePhase,
-  PHASE_TRANSITIONS,
   type MeetingStatus,
   type Message,
   type MeetingSummary,

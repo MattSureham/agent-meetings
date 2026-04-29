@@ -40,6 +40,7 @@ export interface BrowserAgentDef {
 export type AgentDef = SubprocessAgentDef | LLMAgentDef | BrowserAgentDef;
 
 export interface MeetingsConfig {
+  mode: 'debate' | 'collaboration';
   turnTimeoutMs: number;
   maxRebuttalRounds: number;
   maxDeliberationTurns: number;

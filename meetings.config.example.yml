@@ -84,6 +84,7 @@ agents:
     timeoutMs: 120000
 
 meetings:
+  mode: debate                    # "debate" (structured debate) or "collaboration" (plan → build → review)
   turnTimeoutMs: 60000
   maxRebuttalRounds: 1
   maxDeliberationTurns: 10

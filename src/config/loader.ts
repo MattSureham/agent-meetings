@@ -106,6 +106,14 @@ function validateConfig(config: Config): void {
     );
   }
 
+  if (
+    config.meetings.mode &&
+    !['debate', 'collaboration'].includes(config.meetings.mode)
+  ) {
+    throw new Error(`meetings.mode must be "debate" or "collaboration"`);
+  }
+
   // Apply defaults
+  config.meetings.mode = config.meetings.mode ?? 'debate';
   config.meetings.maxTotalTurns = config.meetings.maxTotalTurns ?? 50;
 }
