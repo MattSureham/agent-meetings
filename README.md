@@ -346,6 +346,30 @@ agent-meetings run \
   -a chatgpt,claude-web,gemini-web
 ```
 
+**Collaboration mode** (agents plan, build, and review together — more than just talking):
+
+```bash
+agent-meetings run \
+  -t "Build a REST API for a todo app with Express and TypeScript" \
+  -a claude-code,openclaw,deepseek-v4-pro \
+  -m deepseek-v4-pro \
+  --mode collaboration \
+  --work-dir /tmp/todo-api
+```
+
+Collaboration mode uses a different phase flow designed for actual building:
+
+```
+OPENING → PLAN → BUILD → REVIEW → SUMMARY → CONCLUDED
+```
+
+- **PLAN** — each agent proposes an approach and architecture
+- **BUILD** — agents take turns implementing. Each turn prompts the agent to produce concrete output (code, files, docs)
+- **REVIEW** — agents review what the team built and suggest improvements
+- Summary focuses on deliverables and decisions, not consensus and votes
+
+The `--work-dir` flag gives subprocess agents a shared directory — Claude Code and OpenClaw see each other's files and can build on previous work. Default mode is `debate` (structured discussion with positions, rebuttals, and voting).
+
 What you'll see:
 
 ```
@@ -454,6 +478,7 @@ LLM-specific fields:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `mode` | `debate` \| `collaboration` | `debate` | Meeting mode — debate for structured discussion, collaboration for planning + building |
 | `turnTimeoutMs` | number | 60000 | Max time an agent has to respond to a turn |
 | `maxRebuttalRounds` | number | 1 | How many rounds of rebuttal before deliberation |
 | `maxDeliberationTurns` | number | 10 | Max total turns during the deliberation phase |
@@ -473,6 +498,8 @@ agent-meetings run -t <topic> -a <agent-ids> [options]
   -m, --moderator <id>         Agent ID to act as moderator
   -x, --context <text>         Background context (text or path to a file)
   -c, --config <path>          Path to config file (default: ./meetings.config.yml)
+  --mode <mode>                Meeting mode: debate (default) or collaboration
+  --work-dir <path>            Shared working directory for agents to build in (collaboration mode)
   --turn-timeout <ms>          Turn timeout in ms (default: 60000)
   --rebuttal-rounds <n>        Max rebuttal rounds (default: 1)
   --deliberation-turns <n>     Max deliberation turns (default: 10)
