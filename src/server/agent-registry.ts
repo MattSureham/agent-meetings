@@ -11,6 +11,9 @@ import { GeminiAdapter } from '../llm/gemini.js';
 import { OllamaAdapter } from '../llm/ollama.js';
 import { DeepSeekAdapter } from '../llm/deepseek.js';
 import { MinimaxAdapter } from '../llm/minimax.js';
+import { QwenAdapter } from '../llm/qwen.js';
+import { KimiAdapter } from '../llm/kimi.js';
+import { KimiCodeAdapter } from '../llm/kimi-code.js';
 import { BrowserAgent, getSite } from '../agent/browser/adapter.js';
 import { registerBuiltinSites } from '../agent/browser/sites/index.js';
 
@@ -178,6 +181,12 @@ export class AgentRegistry {
         return new DeepSeekAdapter(apiKey, model);
       case 'minimax':
         return new MinimaxAdapter(apiKey, model);
+      case 'qwen':
+        return new QwenAdapter(apiKey, model);
+      case 'kimi':
+        return new KimiAdapter(apiKey, model);
+      case 'kimi-code':
+        return new KimiCodeAdapter(apiKey, model);
       default:
         throw new Error(`Unknown LLM provider: ${provider}`);
     }

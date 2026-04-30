@@ -107,6 +107,30 @@ agents:
     model: abab6.5s-chat
     apiKey: "${MINIMAX_API_KEY}"
 
+  - id: qwen
+    name: "Qwen 3.5"
+    type: llm
+    capabilities: [coding, reasoning, analysis]
+    provider: qwen
+    model: qwen-max
+    apiKey: "${QWEN_API_KEY}"
+
+  - id: kimi
+    name: "Kimi K2.6"
+    type: llm
+    capabilities: [coding, analysis, reasoning]
+    provider: kimi
+    model: kimi-latest
+    apiKey: "${MOONSHOT_API_KEY}"
+
+  - id: kimi-code
+    name: "Kimi Code"
+    type: llm
+    capabilities: [coding, debugging, building]
+    provider: kimi-code
+    model: kimi-for-coding
+    apiKey: "${KIMI_API_KEY}"
+
 meetings:
   mode: debate
   turnTimeoutMs: 60000

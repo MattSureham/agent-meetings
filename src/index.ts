@@ -14,6 +14,9 @@ export { GeminiAdapter } from './llm/gemini.js';
 export { OllamaAdapter } from './llm/ollama.js';
 export { DeepSeekAdapter } from './llm/deepseek.js';
 export { MinimaxAdapter } from './llm/minimax.js';
+export { QwenAdapter } from './llm/qwen.js';
+export { KimiAdapter } from './llm/kimi.js';
+export { KimiCodeAdapter } from './llm/kimi-code.js';
 
 export {
   MeetingEngine,
