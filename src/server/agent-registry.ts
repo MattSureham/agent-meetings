@@ -14,6 +14,7 @@ import { MinimaxAdapter } from '../llm/minimax.js';
 import { QwenAdapter } from '../llm/qwen.js';
 import { KimiAdapter } from '../llm/kimi.js';
 import { KimiCodeAdapter } from '../llm/kimi-code.js';
+import { OpenAICompatAdapter } from '../llm/openai-compat.js';
 import { BrowserAgent, getSite } from '../agent/browser/adapter.js';
 import { registerBuiltinSites } from '../agent/browser/sites/index.js';
 
@@ -177,6 +178,8 @@ export class AgentRegistry {
         return new GeminiAdapter(apiKey, model);
       case 'ollama':
         return new OllamaAdapter(model, endpoint);
+      case 'openai-compat':
+        return new OpenAICompatAdapter(apiKey, model, endpoint ?? 'http://127.0.0.1:8000/v1');
       case 'deepseek':
         return new DeepSeekAdapter(apiKey, model);
       case 'minimax':

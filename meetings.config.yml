@@ -131,6 +131,26 @@ agents:
     model: kimi-for-coding
     apiKey: "${KIMI_API_KEY}"
 
+  # ── Local LLMs (self-hosted — no cloud API key needed) ──
+
+  - id: vllm
+    name: "vLLM"
+    type: llm
+    capabilities: [coding, reasoning, analysis]
+    provider: openai-compat
+    model: "${VLLM_MODEL}"
+    apiKey: "not-needed"
+    endpoint: "${VLLM_ENDPOINT}"
+
+  - id: lmstudio
+    name: "LM Studio"
+    type: llm
+    capabilities: [coding, reasoning, creative]
+    provider: openai-compat
+    model: "${LMSTUDIO_MODEL}"
+    apiKey: "not-needed"
+    endpoint: "${LMSTUDIO_ENDPOINT}"
+
 meetings:
   mode: debate
   turnTimeoutMs: 60000
