@@ -31,11 +31,11 @@ export function loadConfig(path?: string): Config {
 const missingEnvVars: string[] = [];
 
 function interpolateEnv(raw: string): string {
-  return raw.replace(/\$\{(\w+)\}/g, (_, name) => {
+  return raw.replace(/\$\{(\w+)(?::-(.*?))?\}/g, (_, name, fallback) => {
     const value = process.env[name];
     if (!value) {
       missingEnvVars.push(name);
-      return '';
+      return fallback ?? '';
     }
     return value;
   });

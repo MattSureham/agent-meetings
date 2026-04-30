@@ -138,18 +138,18 @@ agents:
     type: llm
     capabilities: [coding, reasoning, analysis]
     provider: openai-compat
-    model: "${VLLM_MODEL}"
+    model: "${VLLM_MODEL:-meta-llama/Llama-4-Scout-17B-16E-Instruct}"
     apiKey: "not-needed"
-    endpoint: "${VLLM_ENDPOINT}"
+    endpoint: "${VLLM_ENDPOINT:-http://127.0.0.1:8000/v1}"
 
   - id: lmstudio
     name: "LM Studio"
     type: llm
     capabilities: [coding, reasoning, creative]
     provider: openai-compat
-    model: "${LMSTUDIO_MODEL}"
+    model: "${LMSTUDIO_MODEL:-local-model}"
     apiKey: "not-needed"
-    endpoint: "${LMSTUDIO_ENDPOINT}"
+    endpoint: "${LMSTUDIO_ENDPOINT:-http://127.0.0.1:1234/v1}"
 
 meetings:
   mode: debate
