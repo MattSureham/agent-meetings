@@ -3,7 +3,25 @@ import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type { Config, AgentDef } from './types.js';
 
+function loadEnvFile(): void {
+  const envPath = resolve('.env');
+  if (!existsSync(envPath)) return;
+  const lines = readFileSync(envPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+    if (key && !(key in process.env)) {
+      process.env[key] = val;
+    }
+  }
+}
+
 export function loadConfig(path?: string): Config {
+  loadEnvFile();
   const configPath = resolve(path ?? './meetings.config.yml');
 
   if (!existsSync(configPath)) {
