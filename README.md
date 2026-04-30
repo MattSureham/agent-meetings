@@ -272,7 +272,7 @@ python --version
 
 **macOS / Linux:**
 ```bash
-git clone https://github.com/MattSureham/agent-meetings.git
+git clone https://github.com/MattSureham/teamagents.git
 cd agent-meetings
 npm install
 npm run build
@@ -280,14 +280,14 @@ npm run build
 
 **Windows (Command Prompt):**
 ```cmd
-git clone https://github.com/MattSureham/agent-meetings.git
+git clone https://github.com/MattSureham/teamagents.git
 cd agent-meetings
 npm install && npm run build
 ```
 
 **Windows (PowerShell):**
 ```powershell
-git clone https://github.com/MattSureham/agent-meetings.git
+git clone https://github.com/MattSureham/teamagents.git
 cd agent-meetings
 npm install; npm run build
 ```
