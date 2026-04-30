@@ -155,7 +155,22 @@ agents:
     apiKey: "${ANTHROPIC_API_KEY}"     # reads from ANTHROPIC_API_KEY env var
 ```
 
-Supported providers: `anthropic`, `openai`, `gemini`, `deepseek`, `minimax`, `ollama` (local models).
+Supported providers:
+
+| Provider | Adapter | Endpoint | Auth |
+|----------|---------|----------|------|
+| `anthropic` | AnthropicAdapter | `api.anthropic.com` | `ANTHROPIC_API_KEY` env or `apiKey` |
+| `openai` | OpenAIAdapter | `api.openai.com` | `OPENAI_API_KEY` env or `apiKey` |
+| `gemini` | GeminiAdapter | Google AI | `GEMINI_API_KEY` env or `apiKey` |
+| `deepseek` | DeepSeekAdapter | `api.deepseek.com` | `DEEPSEEK_API_KEY` env or `apiKey` |
+| `minimax` | MinimaxAdapter | `api.minimax.chat` | `MINIMAX_API_KEY` env or `apiKey` |
+| `qwen` | QwenAdapter | `dashscope-intl.aliyuncs.com` | `QWEN_API_KEY` env or `apiKey` |
+| `kimi` | KimiAdapter | `api.moonshot.ai` | `MOONSHOT_API_KEY` env or `apiKey` |
+| `kimi-code` | KimiCodeAdapter | `api.kimi.com/coding/v1` | `KIMI_API_KEY` env or `apiKey` |
+| `ollama` | OllamaAdapter | `http://127.0.0.1:11434` | none |
+| `openai-compat` | OpenAICompatAdapter | custom `endpoint` | optional `apiKey` |
+
+`openai-compat` covers any local OpenAI-compatible server — vLLM, LM Studio, llama.cpp, text-generation-webui, and more. Set `endpoint` to your server's base URL (e.g., `http://127.0.0.1:8000/v1`).
 
 #### Protocol agents (WebSocket)
 
@@ -220,94 +235,207 @@ Each turn has a configurable timeout (`turnTimeoutMs`, default 60,000ms). If an 
 
 ---
 
-## Quick Start
+## Deployment Guide
+
+This guide covers setting up Agent Meetings from scratch on macOS and Windows — cloning the repo, installing dependencies, configuring agents, and running your first meeting.
 
 ### Prerequisites
 
-- Node.js 18+ (for built-in `fetch` and `crypto`)
-- One or more LLM API keys from your preferred provider (see supported providers below)
-- **No API key?** Use browser agents — they control free chat UIs (ChatGPT, Claude, Gemini, DeepSeek) through a real browser. Playwright is included. Just log in once.
-- **Optional**: CLI-based agents installed if you want builders that can write code:
-  - [`claude`](https://docs.anthropic.com/en/docs/claude-code) — Claude Code CLI
-  - [`openclaw`](https://github.com/openclaw/openclaw) — OpenClaw agent CLI
-  - Any other CLI tool that accepts a prompt argument
+| Requirement | macOS | Windows |
+|-------------|-------|---------|
+| **Node.js 18+** | `brew install node` or [nodejs.org](https://nodejs.org) | [nodejs.org](https://nodejs.org) (LTS, check "Add to PATH") |
+| **Git** | `brew install git` or `xcode-select --install` | [git-scm.com](https://git-scm.com) |
+| **Python 3.11+** (optional) | `brew install python@3.11` | [python.org](https://python.org) or `winget install Python.Python.3.11` |
+| **Playwright Chromium** (optional) | `npx playwright install chromium` | `npx playwright install chromium` |
 
-### Setup
+**Python** is only needed if you plan to use the Hermes builder agent. If you're only using CLI tools (Claude Code, OpenClaw) and LLM APIs, Node.js alone is sufficient.
+
+**Playwright Chromium** is only needed for browser agents (ChatGPT Web, Claude Web, Gemini Web, DeepSeek Web). If you're not using browser agents, skip that step.
+
+Verify your installs:
 
 **macOS / Linux:**
+```bash
+node --version   # must be >= 18
+git --version
+python3 --version  # optional, >= 3.11 for Hermes
+```
 
+**Windows (Command Prompt or PowerShell):**
+```cmd
+node --version
+git --version
+python --version
+```
+
+### Step 1 — Clone and install
+
+**macOS / Linux:**
 ```bash
 git clone https://github.com/MattSureham/agent-meetings.git
 cd agent-meetings
-npm install && npm run build
-npx playwright install chromium   # only needed for browser agents (ChatGPT, Claude Web, etc.)
-cp meetings.config.example.yml meetings.config.yml
+npm install
+npm run build
 ```
 
 **Windows (Command Prompt):**
-
 ```cmd
 git clone https://github.com/MattSureham/agent-meetings.git
 cd agent-meetings
 npm install && npm run build
-npx playwright install chromium
-copy meetings.config.example.yml meetings.config.yml
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
 git clone https://github.com/MattSureham/agent-meetings.git
 cd agent-meetings
 npm install; npm run build
-npx playwright install chromium
-Copy-Item meetings.config.example.yml meetings.config.yml
 ```
 
-### Set API keys
+### Step 2 — Set up API keys (.env)
+
+Create a `.env` file from the template:
 
 **macOS / Linux:**
-
 ```bash
-export DEEPSEEK_API_KEY="sk-..."
-export OPENAI_API_KEY="sk-..."
+cp .env.example .env
 ```
 
 **Windows (Command Prompt):**
-
 ```cmd
-set DEEPSEEK_API_KEY=sk-...
-set OPENAI_API_KEY=sk-...
+copy .env.example .env
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
-$env:DEEPSEEK_API_KEY="sk-..."
-$env:OPENAI_API_KEY="sk-..."
+Copy-Item .env.example .env
 ```
 
-### Define your agents
+Edit `.env` and add your API keys:
 
-Edit `meetings.config.yml` and add your agents. API keys go in environment variables — the config reads them with `${VAR}` syntax:
+```ini
+# Required if using DeepSeek models (moderator, summarizer)
+DEEPSEEK_API_KEY=sk-...
+
+# Optional — add keys for the providers you use
+MINIMAX_API_KEY=
+QWEN_API_KEY=
+MOONSHOT_API_KEY=
+KIMI_API_KEY=
+```
+
+The framework reads `.env` automatically on every run — no need to `export` keys in each terminal session. All keys are optional; only add the ones for providers you actually use.
+
+**Environment variable fallback:** If a key isn't in `.env`, the framework checks the shell environment (`export` or `$env:`). `.env` takes priority for keys it defines.
+
+### Step 3 — Configure agents
+
+Edit `meetings.config.yml`. The framework ships with a fully annotated example at [meetings.config.example.yml](meetings.config.example.yml). You can start from that:
+
+**macOS / Linux:**
+```bash
+cp meetings.config.example.yml meetings.config.yml
+```
+
+**Windows (Command Prompt):**
+```cmd
+copy meetings.config.example.yml meetings.config.yml
+```
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item meetings.config.example.yml meetings.config.yml
+```
+
+Or build your own. Here's a minimal config with common agents:
 
 ```yaml
+server:
+  port: 4200
+  host: "0.0.0.0"
+  dataDir: "./data"
+
 agents:
+  # ── Thinkers (LLM API) ──
   - id: deepseek
     name: "DeepSeek"
     type: llm
-    capabilities: [architecture, planning, coding]
     provider: deepseek
     model: deepseek-chat
     apiKey: "${DEEPSEEK_API_KEY}"
+    capabilities: [architecture, planning, coding, reasoning]
 
   - id: minimax
     name: "MiniMax"
     type: llm
-    capabilities: [brainstorming, creative, design]
     provider: minimax
     model: abab6.5s-chat
     apiKey: "${MINIMAX_API_KEY}"
+    capabilities: [brainstorming, creative, design]
+
+  # ── Builders (subprocess — can write code, run commands) ──
+  - id: claude-code
+    name: "Claude Code"
+    type: subprocess
+    tool: claude-code
+    command: claude
+    args: ["-p", "{prompt}", "--output-format", "text", "--permission-mode", "bypassPermissions", "--bare"]
+    timeoutMs: 1800000
+    capabilities: [coding, building, debugging, testing]
+
+meetings:
+  mode: debate
+  defaultModerator: deepseek
+```
+
+Config fields are documented in the [Configuration Reference](#configuration-reference) below.
+
+### Step 4 — Install browser engines (optional)
+
+Only needed if you plan to use browser agents (ChatGPT Web, Claude Web, Gemini Web, DeepSeek Web):
+
+```bash
+npx playwright install chromium
+```
+
+This downloads a Chromium binary (~150 MB) to Playwright's cache. Browser agent sessions are saved in `~/.agent-meetings/browser/<agent-id>/` so you only log in once.
+
+Skip this step if you're only using LLM and subprocess agents.
+
+### Step 5 — Verify
+
+Run a quick test meeting to confirm everything works:
+
+```bash
+npx tsx src/cli/index.ts run \
+  -t "Say hello and introduce yourself in one sentence" \
+  -a deepseek \
+  -m deepseek
+```
+
+If you see the opening, a DeepSeek response, and a summary, you're ready. Full usage: `npx tsx src/cli/index.ts run --help`.
+
+### Running on another machine
+
+To set up the framework on a second machine:
+
+1. **Clone the repo** (Step 1 above)
+2. **Copy your `.env` file** from your primary machine — it contains your API keys. Or create a new one from `.env.example` and re-enter your keys.
+3. **Copy your `meetings.config.yml`** — or recreate it. Note that file paths in `command` and `cwd` fields may differ between machines (e.g., Hermes path `/Users/xxx/hermes-agent` vs `C:\Users\xxx\hermes-agent`).
+4. **Install provider-specific CLI tools** if you use builder agents:
+   - **Claude Code**: `npm install -g @anthropic-ai/claude-code` then `claude` in PATH
+   - **OpenClaw**: `npm install -g openclaw` then `openclaw` in PATH
+   - **Hermes**: clone `https://github.com/NousResearch/Hermes-Agent.git`, set up venv, install dependencies
+5. **Run Step 5** to verify.
+
+**Pro tip:** Keep your config and `.env` in a private git repo or a password manager. The config file references API keys via `${VAR}` syntax so the `.env` stays separate — never commit `.env` to git.
+
+### Updating
+
+```bash
+git pull
+npm install        # in case dependencies changed
+npm run build      # recompile TypeScript
 ```
 
 ### Run a meeting (one command)
@@ -469,7 +597,7 @@ LLM-specific fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `provider` | `anthropic` \| `openai` \| `gemini` \| `deepseek` \| `minimax` \| `ollama` | Which API to call |
+| `provider` | `anthropic` \| `openai` \| `gemini` \| `deepseek` \| `minimax` \| `qwen` \| `kimi` \| `kimi-code` \| `ollama` \| `openai-compat` | Which API to call |
 | `model` | string | Model name (e.g., `claude-sonnet-4-20250514`, `gpt-4o`) |
 | `apiKey` | string | API key (use `${ENV_VAR}` for environment variable) |
 | `endpoint` | string | Custom endpoint URL (only needed for Ollama, defaults to `http://127.0.0.1:11434`) |
@@ -692,6 +820,99 @@ data/
 Each `run` command saves two files: a `.json` record for programmatic access and a `.log` file for human reading. Both are written automatically at meeting end. The file paths are printed to the terminal.
 
 ---
+
+## Troubleshooting
+
+### Config fails to load
+
+**Symptom:** `Failed to load config: Implicit map keys need to be followed by map values at line X`
+
+**Fix:** A stray or invisible character is on the indicated line. Common causes:
+- Curly/smart quotes (`"` vs `"`) from copy-paste — re-type quotes as straight ASCII
+- Non-printing Unicode characters — delete the affected line and re-type it
+- Missing space after `- ` in a list item
+
+Run `npx tsx src/cli/index.ts config validate` to check your config.
+
+### API key errors
+
+**Symptom:** `DeepSeek API error 401: Authentication Fails` (or similar for other providers)
+
+**Fix:**
+1. Check your `.env` file exists and has the correct key: `cat .env`
+2. Verify the key is valid on the provider's console
+3. Make sure the `apiKey` field in your config references the right env var: `apiKey: "${DEEPSEEK_API_KEY}"`
+
+### Agent not found
+
+**Symptom:** `Agent "xxx" not found in config`
+
+**Fix:** The agent ID in your `--agents` flag must match an `id` field in `meetings.config.yml`. Run `npx tsx src/cli/index.ts list agents` (requires server mode) or check your config directly.
+
+### Builder agent times out
+
+**Symptom:** `[Agent X did not respond within the time limit]`
+
+**Fix:** Increase `timeoutMs` for that agent in your config. Builders writing code need more time than thinkers:
+```yaml
+- id: claude-code
+  ...
+  timeoutMs: 1800000   # 30 minutes
+```
+
+### Browser agent can't find Chromium
+
+**Symptom:** `Executable doesn't exist at .../chromium/.../chrome`
+
+**Fix:** Run `npx playwright install chromium`. This downloads the Chromium binary Playwright needs (~150 MB).
+
+### Browser agent shows CAPTCHA or "Something went wrong"
+
+**Symptom:** Cloudflare verification, login loops, or generic errors in browser agents
+
+**Fix:**
+1. Run `npx tsx src/cli/index.ts browser-setup` to open login windows before a meeting
+2. Log in manually in each window — sessions persist in `~/.agent-meetings/browser/`
+3. If the issue persists, delete the session folder (`rm -rf ~/.agent-meetings/browser/<agent-id>/`) and re-login
+
+### "command not found" for builder agent
+
+**Symptom:** Subprocess agent health check fails with "Command not found"
+
+**Fix:** The `command` field in your config must be in PATH or an absolute path:
+```yaml
+# These work:
+command: claude                  # in PATH
+command: /usr/local/bin/claude   # absolute path
+command: ./venv/bin/python       # relative to project root
+```
+
+For Hermes specifically, make sure the venv is set up:
+```bash
+cd /path/to/hermes-agent
+python3 -m venv venv
+./venv/bin/pip install -e .
+```
+
+### Shell quoting issues on macOS/Linux
+
+**Symptom:** `dquote>` prompt appearing, truncated arguments, or unexpected behavior with `-x` / `--context`
+
+**Fix:** Use straight ASCII quotes (`"` and `'`), not smart/curly quotes from word processors or chat apps. For long context text, use a file instead:
+```bash
+echo "your long context here..." > /tmp/context.txt
+npx tsx src/cli/index.ts run -t "Topic" -x /tmp/context.txt -a ...
+```
+
+### TypeScript compile errors after pull
+
+**Symptom:** `npx tsc --noEmit` shows errors after `git pull`
+
+**Fix:**
+```bash
+npm install        # new adapters may add dependencies
+npm run build      # recompile
+```
 
 ## License
 
