@@ -107,6 +107,14 @@ agents:
     model: abab6.5s-chat
     apiKey: "${MINIMAX_API_KEY}"
 
+  - id: minimax-m2.7
+    name: "MiniMax M2.7"
+    type: llm
+    capabilities: [brainstorming, creative, design, writing, iteration, coding, reasoning]
+    provider: minimax
+    model: minimax-m2.7
+    apiKey: "${MINIMAX_API_KEY}"
+
   - id: qwen
     name: "Qwen 3.5"
     type: llm
