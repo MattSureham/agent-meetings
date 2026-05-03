@@ -166,8 +166,8 @@
       </div>
     </div>
 
-    <div id="workdir-group" style="display:none">
-      <label for="workdir">Working Directory</label>
+    <div id="workdir-group">
+      <label for="workdir">Working Directory <span style="color:#6b7280;font-weight:400">(for collaboration — agents share this folder)</span></label>
       <input type="text" id="workdir" placeholder="e.g. ./workspace/my-project">
     </div>
 
@@ -281,7 +281,6 @@ function handleFileUpload() {
 // ── Mode toggle ──
 function setMode(mode) {
   $$('#mode-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-  $('#workdir-group').style.display = mode === 'collaboration' ? 'block' : 'none';
 }
 
 function getMode() {
@@ -310,7 +309,7 @@ async function startMeeting() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         topic, context, participantIds, moderatorId,
-        autoStart: true, workDir,
+        autoStart: true, mode, workDir,
       }),
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }

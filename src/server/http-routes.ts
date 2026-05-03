@@ -30,6 +30,7 @@ interface CreateMeetingBody {
   participantIds: string[];
   moderatorId?: string;
   autoStart?: boolean;
+  mode?: 'debate' | 'collaboration';
   workDir?: string;
 }
 
@@ -148,6 +149,7 @@ export function createRouter(
           context: body.context ?? '',
           participants,
           moderatorId,
+          mode: body.mode ?? config.meetings.mode,
           workDir: body.workDir,
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
