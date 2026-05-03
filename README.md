@@ -558,6 +558,24 @@ agent-meetings list meetings
 agent-meetings view <id>
 ```
 
+### Web Console
+
+Agent Meetings includes a built-in web UI at `http://127.0.0.1:4200/` — no extra setup required.
+
+```bash
+npm run build
+node dist/cli/index.js serve
+```
+
+Then open **`http://127.0.0.1:4200/`** in a browser. The web console provides:
+
+- **Agent selection** — click chips to pick participants (color-coded: purple=LLM, orange=browser, green=subprocess)
+- **Topic & context** — type or upload a `.txt`/`.md` file
+- **Mode toggle** — debate or collaboration
+- **Settings** — rebuttal rounds, deliberation turns, max turns, timeout, moderator
+- **Live transcript** — messages stream in real time with phase dividers and colored avatars
+- **Summary** — consensus, key points, dissenting views, vote tally, deliverables on conclusion
+
 ---
 
 ## Configuration Reference
