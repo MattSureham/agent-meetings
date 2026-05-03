@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeamAgents — Meeting Console</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #d4d4d8; height: 100vh; display: flex; }
+  a { color: #7eb6ff; }
+
+  /* Left panel */
+  .sidebar { width: 420px; min-width: 420px; background: #16181f; display: flex; flex-direction: column; border-right: 1px solid #252830; overflow-y: auto; }
+  .sidebar-header { padding: 20px 24px 16px; border-bottom: 1px solid #252830; }
+  .sidebar-header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  .sidebar-header span { font-size: 13px; color: #6b7280; }
+  .sidebar-body { padding: 20px 24px; flex: 1; display: flex; flex-direction: column; gap: 18px; }
+
+  label { display: block; font-size: 13px; font-weight: 500; color: #a1a5b0; margin-bottom: 6px; }
+  textarea, input[type=text], select { width: 100%; padding: 10px 12px; background: #1c1e26; border: 1px solid #2d3039; border-radius: 6px; color: #e4e4e7; font-size: 14px; font-family: inherit; resize: vertical; }
+  textarea:focus, input:focus, select:focus { outline: none; border-color: #4f8fff; }
+  textarea { min-height: 60px; }
+  textarea.tall { min-height: 90px; }
+
+  .file-upload { display: flex; gap: 8px; }
+  .file-upload input[type=file] { display: none; }
+  .file-upload .btn { flex-shrink: 0; }
+  .file-name { flex: 1; padding: 10px 12px; background: #1c1e26; border: 1px solid #2d3039; border-radius: 6px; font-size: 13px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
+
+  .agent-grid { display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto; padding: 2px; }
+  .agent-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1px solid #2d3039; background: #1c1e26; color: #a1a5b0; transition: all 0.15s; user-select: none; }
+  .agent-chip:hover { border-color: #4f8fff33; background: #1f2330; }
+  .agent-chip.selected { border-color: #4f8fff; background: #1a2740; color: #fff; }
+  .agent-chip .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .agent-chip .dot.llm { background: #a78bfa; }
+  .agent-chip .dot.browser { background: #fb923c; }
+  .agent-chip .dot.subprocess { background: #34d399; }
+  .agent-chip .dot.protocol { background: #fbbf24; }
+  .agent-chip .tag { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: #252830; color: #6b7280; text-transform: uppercase; }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .settings-grid label { margin-bottom: 3px; font-size: 12px; }
+  .settings-grid input, .settings-grid select { padding: 7px 10px; font-size: 13px; }
+
+  .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #4f8fff; color: #fff; flex: 1; }
+  .btn-primary:hover { background: #3d7ae8; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-outline { background: transparent; border: 1px solid #2d3039; color: #a1a5b0; }
+  .btn-outline:hover { border-color: #4f8fff; color: #fff; }
+  .btn-danger { background: #dc3545; color: #fff; }
+  .btn-danger:hover { background: #c82333; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .mode-toggle { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #2d3039; }
+  .mode-toggle button { flex: 1; padding: 9px 12px; background: #1c1e26; border: none; color: #a1a5b0; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .mode-toggle button.active { background: #4f8fff; color: #fff; }
+  .mode-toggle button:not(.active):hover { background: #22242e; }
+
+  /* Right panel */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .main-header { padding: 20px 24px 16px; border-bottom: 1px solid #252830; display: flex; align-items: center; justify-content: space-between; }
+  .main-header h2 { font-size: 18px; font-weight: 600; color: #fff; }
+  .main-header .status { font-size: 13px; padding: 4px 10px; border-radius: 12px; }
+  .status.idle { background: #252830; color: #6b7280; }
+  .status.active { background: #1a3a1a; color: #34d399; }
+  .status.concluded { background: #252830; color: #a1a5b0; }
+  .main-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 4px; }
+
+  .transcript-empty { text-align: center; padding: 80px 20px; color: #4a4d56; }
+  .transcript-empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .transcript-empty p { font-size: 15px; }
+
+  .msg { display: flex; gap: 12px; padding: 10px 14px; border-radius: 6px; transition: background 0.15s; }
+  .msg:hover { background: #1a1c24; }
+  .msg-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .msg.system .msg-avatar { background: #3b3354; color: #a78bfa; }
+  .msg.agent .msg-avatar { background: #1a3a2a; color: #34d399; }
+  .msg-body { flex: 1; min-width: 0; }
+  .msg-meta { font-size: 12px; color: #6b7280; margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+  .msg-author { font-weight: 600; color: #d4d4d8; }
+  .msg-phase { padding: 1px 6px; border-radius: 8px; background: #1f2330; font-size: 10px; text-transform: uppercase; color: #7eb6ff; }
+  .msg-content { font-size: 14px; line-height: 1.6; color: #c4c8d0; white-space: pre-wrap; word-break: break-word; }
+
+  .phase-divider { text-align: center; padding: 16px 0 8px; color: #4f8fff; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+  .phase-divider::before, .phase-divider::after { content: ' ── '; color: #252830; }
+
+  .summary-box { background: #1a1f2e; border: 1px solid #253350; border-radius: 8px; padding: 20px; margin-top: 16px; }
+  .summary-box h3 { font-size: 16px; color: #7eb6ff; margin-bottom: 12px; }
+  .summary-box ul { padding-left: 20px; }
+  .summary-box li { margin-bottom: 6px; font-size: 14px; line-height: 1.5; }
+
+  .error-banner { background: #2d1a1a; border: 1px solid #5c2020; color: #fca5a5; padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>TeamAgents</h1>
+    <span>Meeting Console</span>
+  </div>
+  <div class="sidebar-body">
+    <div id="error-container"></div>
+
+    <div>
+      <label for="topic">Topic</label>
+      <textarea id="topic" placeholder="What should the agents discuss or build?"></textarea>
+    </div>
+
+    <div>
+      <label>Context (optional)</label>
+      <textarea id="context" class="tall" placeholder="Background information, constraints, or goals..."></textarea>
+      <div class="file-upload" style="margin-top:6px">
+        <button class="btn btn-outline btn-sm" id="ctx-upload-btn">Upload file</button>
+        <input type="file" id="ctx-file" accept=".txt,.md,.json,.yaml,.yml">
+        <span class="file-name" id="ctx-file-name">No file selected</span>
+      </div>
+    </div>
+
+    <div>
+      <label>Agents</label>
+      <div class="agent-grid" id="agent-list">
+        <span style="color:#6b7280;font-size:13px;padding:6px">Loading agents...</span>
+      </div>
+    </div>
+
+    <div>
+      <label>Moderator</label>
+      <select id="moderator"></select>
+    </div>
+
+    <div>
+      <label>Meeting Mode</label>
+      <div class="mode-toggle" id="mode-toggle">
+        <button data-mode="debate" class="active">Debate</button>
+        <button data-mode="collaboration">Collaboration</button>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <div><label>Rebuttal Rounds</label><input type="number" id="rebuttal-rounds" value="1" min="0" max="10"></div>
+      <div><label>Deliberation Turns</label><input type="number" id="deliberation-turns" value="10" min="1" max="100"></div>
+      <div><label>Max Total Turns</label><input type="number" id="max-turns" value="50" min="5" max="500"></div>
+      <div><label>Turn Timeout (ms)</label><input type="number" id="turn-timeout" value="60000" min="5000" step="5000"></div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" id="btn-start" disabled>Start Meeting</button>
+      <button class="btn btn-danger" id="btn-cancel" disabled>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="main-header">
+    <h2 id="meeting-title">No active meeting</h2>
+    <span class="status idle" id="meeting-status">idle</span>
+  </div>
+  <div class="main-body" id="transcript-container">
+    <div class="transcript-empty">
+      <div class="icon">🧑‍💻</div>
+      <p>Set up a meeting on the left and press <strong>Start Meeting</strong>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+let meetingId = null;
+let pollTimer = null;
+let agents = [];
+
+// ── Init ──
+async function init() {
+  try {
+    const res = await fetch('/agents');
+    agents = await res.json();
+    renderAgentChips();
+    renderModeratorSelect();
+  } catch(e) { showError('Failed to load agents. Is the server running?'); }
+
+  // Event listeners
+  $('#btn-start').addEventListener('click', startMeeting);
+  $('#btn-cancel').addEventListener('click', cancelMeeting);
+  $('#ctx-upload-btn').addEventListener('click', () => $('#ctx-file').click());
+  $('#ctx-file').addEventListener('change', handleFileUpload);
+  $$('#mode-toggle button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+}
+
+// ── Agent chips ──
+function renderAgentChips() {
+  const container = $('#agent-list');
+  container.innerHTML = agents.map(a => `
+    <div class="agent-chip" data-id="${a.id}" onclick="toggleAgent(this)">
+      <span class="dot ${a.type}"></span>
+      ${a.name}
+      <span class="tag">${a.type}</span>
+    </div>
+  `).join('');
+}
+
+function toggleAgent(chip) {
+  chip.classList.toggle('selected');
+  updateStartButton();
+}
+
+function getSelectedAgents() {
+  return [...$$('.agent-chip.selected')].map(c => c.dataset.id);
+}
+
+function renderModeratorSelect() {
+  const sel = $('#moderator');
+  sel.innerHTML = agents.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+}
+
+function updateStartButton() {
+  const topic = $('#topic').value.trim();
+  const selected = getSelectedAgents().length;
+  $('#btn-start').disabled = !topic || selected < 2;
+}
+
+$('#topic').addEventListener('input', updateStartButton);
+// Re-check when chips change
+new MutationObserver(updateStartButton).observe($('#agent-list'), { subtree: true, attributes: true, attributeFilter: ['class'] });
+
+// ── File upload ──
+function handleFileUpload() {
+  const file = $('#ctx-file').files[0];
+  if (!file) return;
+  $('#ctx-file-name').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = () => { $('#context').value = reader.result; };
+  reader.readAsText(file);
+}
+
+// ── Mode toggle ──
+function setMode(mode) {
+  $$('#mode-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+function getMode() {
+  return $('#mode-toggle').querySelector('.active')?.dataset.mode ?? 'debate';
+}
+
+// ── Start meeting ──
+async function startMeeting() {
+  const topic = $('#topic').value.trim();
+  const context = $('#context').value.trim();
+  const participantIds = getSelectedAgents();
+  const moderatorId = $('#moderator').value;
+
+  if (!topic || participantIds.length < 2) return;
+
+  $('#btn-start').disabled = true;
+  $('#btn-start').textContent = 'Starting...';
+  clearError();
+
+  try {
+    const res = await fetch('/meetings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        topic, context, participantIds, moderatorId,
+        autoStart: true,
+      }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const data = await res.json();
+    meetingId = data.id;
+    $('#meeting-title').textContent = topic;
+    updateStatus('active');
+    $('#btn-cancel').disabled = false;
+    $('#btn-start').textContent = 'Start Meeting';
+    startPolling();
+  } catch(e) {
+    showError(e.message);
+    $('#btn-start').disabled = false;
+    $('#btn-start').textContent = 'Start Meeting';
+  }
+}
+
+// ── Cancel meeting ──
+async function cancelMeeting() {
+  if (!meetingId) return;
+  try {
+    await fetch(`/meetings/${meetingId}/cancel`, { method: 'POST' });
+  } catch(e) { /* ignore */ }
+  stopPolling();
+  updateStatus('idle');
+  $('#btn-cancel').disabled = true;
+  $('#btn-start').disabled = false;
+  meetingId = null;
+}
+
+// ── Polling ──
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(pollMeeting, 1000);
+  pollMeeting();
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+let seenMessageCount = 0;
+let lastPhase = null;
+const PHASE_LABELS = {
+  opening: 'OPENING — Topic Introduction',
+  position: 'POSITION — Statements',
+  rebuttal: 'REBUTTAL — Responses',
+  deliberation: 'DELIBERATION — Discussion',
+  voting: 'VOTING — Casting Votes',
+  plan: 'PLAN — Proposing Approach',
+  build: 'BUILD — Implementation',
+  review: 'REVIEW — Reviewing Output',
+  summary: 'SUMMARY',
+  concluded: 'CONCLUDED',
+};
+
+async function pollMeeting() {
+  if (!meetingId) return;
+  try {
+    const res = await fetch(`/meetings/${meetingId}`);
+    if (!res.ok) return;
+    const meeting = await res.json();
+    updateStatus(meeting.status);
+
+    const container = $('#transcript-container');
+    const msgs = meeting.transcript || [];
+
+    // Remove empty state on first message
+    if (msgs.length > 0 && seenMessageCount === 0) {
+      container.innerHTML = '';
+    }
+
+    // Render new messages
+    for (let i = seenMessageCount; i < msgs.length; i++) {
+      const msg = msgs[i];
+      if (msg.phase !== lastPhase) {
+        lastPhase = msg.phase;
+        const label = PHASE_LABELS[msg.phase] ?? msg.phase.toUpperCase();
+        const div = document.createElement('div');
+        div.className = 'phase-divider';
+        div.textContent = label;
+        container.appendChild(div);
+      }
+      container.appendChild(renderMessage(msg));
+    }
+    seenMessageCount = msgs.length;
+
+    // Meeting concluded
+    if (meeting.status === 'concluded' || meeting.status === 'cancelled') {
+      stopPolling();
+      $('#btn-cancel').disabled = true;
+      $('#btn-start').disabled = false;
+      if (meeting.summary) renderSummary(meeting.summary, meeting.mode);
+    }
+  } catch(e) { /* retry next tick */ }
+}
+
+function renderMessage(msg) {
+  const div = document.createElement('div');
+  div.className = msg.authorId === '__system_moderator__' ? 'msg system' : 'msg agent';
+
+  const initial = (msg.authorName || '?')[0].toUpperCase();
+  div.innerHTML = `
+    <div class="msg-avatar">${initial}</div>
+    <div class="msg-body">
+      <div class="msg-meta">
+        <span class="msg-author">${escapeHtml(msg.authorName)}</span>
+        <span class="msg-phase">${msg.phase}</span>
+        <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
+      </div>
+      <div class="msg-content">${escapeHtml(msg.content)}</div>
+    </div>
+  `;
+  return div;
+}
+
+function renderSummary(s, mode) {
+  const container = $('#transcript-container');
+  let html = '<div class="summary-box"><h3>' + (mode === 'collaboration' ? 'Project Summary' : 'Meeting Summary') + '</h3>';
+  html += `<p style="margin-bottom:12px"><strong>Outcome:</strong> ${escapeHtml(s.consensus)}</p>`;
+  if (s.keyPoints?.length) {
+    html += '<p style="margin-bottom:4px"><strong>Key Points:</strong></p><ul>' + s.keyPoints.map(p => `<li>${escapeHtml(p)}</li>`).join('') + '</ul>';
+  }
+  if (s.actionItems?.length) {
+    html += '<p style="margin-top:12px;margin-bottom:4px"><strong>Action Items:</strong></p><ul>' + s.actionItems.map(a => `<li>${escapeHtml(a)}</li>`).join('') + '</ul>';
+  }
+  if (s.voteTally) html += `<p style="margin-top:8px"><strong>Vote:</strong> YES=${s.voteTally.yes ?? 0} NO=${s.voteTally.no ?? 0} ABSTAIN=${s.voteTally.abstain ?? 0}</p>`;
+  if (s.deliverables?.length) {
+    html += '<p style="margin-top:12px;margin-bottom:4px"><strong>Deliverables:</strong></p><ul>' + s.deliverables.map(d => `<li>${escapeHtml(d)}</li>`).join('') + '</ul>';
+  }
+  html += '</div>';
+  container.insertAdjacentHTML('beforeend', html);
+}
+
+function updateStatus(status) {
+  const el = $('#meeting-status');
+  el.textContent = status;
+  el.className = 'status ' + status;
+  if (status === 'concluded') $('#btn-cancel').disabled = true;
+}
+
+function showError(msg) {
+  const el = $('#error-container');
+  el.innerHTML = `<div class="error-banner">${escapeHtml(msg)}</div>`;
+}
+function clearError() { $('#error-container').innerHTML = ''; }
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+init();
+</script>
+</body>
+</html>

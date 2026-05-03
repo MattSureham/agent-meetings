@@ -1,9 +1,23 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, extname } from 'node:path';
 import type { AgentRegistry } from './agent-registry.js';
 import type { DataStore } from '../persistence/types.js';
 import { MeetingEngine } from '../meeting/engine.js';
 import type { Config } from '../config/types.js';
 import type { IAgent } from '../agent/types.js';
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+};
+
+const UI_DIR = join(import.meta.dirname, '..', '..', 'public');
 
 interface RunningMeeting {
   engine: MeetingEngine;
@@ -41,6 +55,20 @@ export function createRouter(
     const method = req.method ?? 'GET';
 
     try {
+      // Static file serving for the web UI
+      if (method === 'GET' && (path === '/' || path === '/ui' || path.startsWith('/ui/'))) {
+        let filePath = path === '/' || path === '/ui' ? '/index.html' : path.replace('/ui', '');
+        const fullPath = join(UI_DIR, filePath);
+        if (existsSync(fullPath)) {
+          const ext = extname(fullPath);
+          res.writeHead(200, { 'content-type': MIME[ext] ?? 'application/octet-stream' });
+          res.end(readFileSync(fullPath));
+        } else {
+          json(res, 404, { error: 'File not found' });
+        }
+        return;
+      }
+
       if (method === 'GET' && path === '/health') {
         return json(res, 200, {
           status: 'ok',
