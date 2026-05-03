@@ -17,7 +17,7 @@
   .sidebar-body { padding: 20px 24px; flex: 1; display: flex; flex-direction: column; gap: 18px; }
 
   label { display: block; font-size: 13px; font-weight: 500; color: #a1a5b0; margin-bottom: 6px; }
-  textarea, input[type=text], select { width: 100%; padding: 10px 12px; background: #1c1e26; border: 1px solid #2d3039; border-radius: 6px; color: #e4e4e7; font-size: 14px; font-family: inherit; resize: vertical; }
+  textarea, input[type=text], input[type=number], select { width: 100%; padding: 10px 12px; background: #1c1e26; border: 1px solid #2d3039; border-radius: 6px; color: #e4e4e7; font-size: 14px; font-family: inherit; resize: vertical; }
   textarea:focus, input:focus, select:focus { outline: none; border-color: #4f8fff; }
   textarea { min-height: 60px; }
   textarea.tall { min-height: 90px; }
@@ -42,14 +42,15 @@
   .settings-grid label { margin-bottom: 3px; font-size: 12px; }
   .settings-grid input, .settings-grid select { padding: 7px 10px; font-size: 13px; }
 
-  .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
   .btn-primary { background: #4f8fff; color: #fff; flex: 1; }
   .btn-primary:hover { background: #3d7ae8; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger { background: #dc3545; color: #fff; flex: 1; }
+  .btn-danger:hover { background: #c82333; }
+  .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-outline { background: transparent; border: 1px solid #2d3039; color: #a1a5b0; }
   .btn-outline:hover { border-color: #4f8fff; color: #fff; }
-  .btn-danger { background: #dc3545; color: #fff; }
-  .btn-danger:hover { background: #c82333; }
   .btn-sm { padding: 5px 10px; font-size: 12px; }
 
   .mode-toggle { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #2d3039; }
@@ -57,14 +58,22 @@
   .mode-toggle button.active { background: #4f8fff; color: #fff; }
   .mode-toggle button:not(.active):hover { background: #22242e; }
 
+  /* Spinner */
+  .spinner { width: 16px; height: 16px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+  button.loading .spinner { display: inline-block; }
+  button.loading .btn-label { opacity: 0.7; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* Right panel */
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .main-header { padding: 20px 24px 16px; border-bottom: 1px solid #252830; display: flex; align-items: center; justify-content: space-between; }
   .main-header h2 { font-size: 18px; font-weight: 600; color: #fff; }
   .main-header .status { font-size: 13px; padding: 4px 10px; border-radius: 12px; }
   .status.idle { background: #252830; color: #6b7280; }
-  .status.active { background: #1a3a1a; color: #34d399; }
+  .status.active { background: #1a3a1a; color: #34d399; animation: pulse 2s infinite; }
   .status.concluded { background: #252830; color: #a1a5b0; }
+  .status.cancelled { background: #2d1a1a; color: #fca5a5; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
   .main-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 4px; }
 
   .transcript-empty { text-align: center; padding: 80px 20px; color: #4a4d56; }
@@ -90,10 +99,28 @@
   .summary-box ul { padding-left: 20px; }
   .summary-box li { margin-bottom: 6px; font-size: 14px; line-height: 1.5; }
 
-  .error-banner { background: #2d1a1a; border: 1px solid #5c2020; color: #fca5a5; padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+  .banner { padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+  .banner-error { background: #2d1a1a; border: 1px solid #5c2020; color: #fca5a5; }
+  .banner-success { background: #1a2d1a; border: 1px solid #205c20; color: #6ee7b7; }
+  .banner-info { background: #1a2430; border: 1px solid #253350; color: #93c5fd; }
+
+  .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .confirm-box { background: #1c1e26; border: 1px solid #3d3040; border-radius: 8px; padding: 24px; text-align: center; max-width: 320px; }
+  .confirm-box p { margin-bottom: 16px; font-size: 15px; }
+  .confirm-box .btn { margin: 0 6px; }
 </style>
 </head>
 <body>
+
+<!-- Confirmation overlay -->
+<div class="confirm-overlay" id="confirm-overlay" style="display:none">
+  <div class="confirm-box">
+    <p>Stop this meeting?</p>
+    <p style="font-size:13px;color:#6b7280">The meeting will be cancelled and agents will stop responding.</p>
+    <button class="btn btn-danger" id="confirm-stop">Yes, stop it</button>
+    <button class="btn btn-outline" id="confirm-cancel">No, continue</button>
+  </div>
+</div>
 
 <!-- Sidebar -->
 <div class="sidebar">
@@ -102,7 +129,7 @@
     <span>Meeting Console</span>
   </div>
   <div class="sidebar-body">
-    <div id="error-container"></div>
+    <div id="banner-container"></div>
 
     <div>
       <label for="topic">Topic</label>
@@ -120,14 +147,14 @@
     </div>
 
     <div>
-      <label>Agents</label>
+      <label>Agents <span style="color:#6b7280;font-weight:400">(select 2+)</span></label>
       <div class="agent-grid" id="agent-list">
         <span style="color:#6b7280;font-size:13px;padding:6px">Loading agents...</span>
       </div>
     </div>
 
     <div>
-      <label>Moderator</label>
+      <label for="moderator">Moderator</label>
       <select id="moderator"></select>
     </div>
 
@@ -139,6 +166,11 @@
       </div>
     </div>
 
+    <div id="workdir-group" style="display:none">
+      <label for="workdir">Working Directory</label>
+      <input type="text" id="workdir" placeholder="e.g. ./workspace/my-project">
+    </div>
+
     <div class="settings-grid">
       <div><label>Rebuttal Rounds</label><input type="number" id="rebuttal-rounds" value="1" min="0" max="10"></div>
       <div><label>Deliberation Turns</label><input type="number" id="deliberation-turns" value="10" min="1" max="100"></div>
@@ -147,8 +179,13 @@
     </div>
 
     <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" id="btn-start" disabled>Start Meeting</button>
-      <button class="btn btn-danger" id="btn-cancel" disabled>Cancel</button>
+      <button class="btn btn-primary" id="btn-start" disabled>
+        <span class="spinner"></span>
+        <span class="btn-label">Start Meeting</span>
+      </button>
+      <button class="btn btn-danger" id="btn-stop" disabled style="display:none">
+        Stop Meeting
+      </button>
     </div>
   </div>
 </div>
@@ -160,7 +197,7 @@
     <span class="status idle" id="meeting-status">idle</span>
   </div>
   <div class="main-body" id="transcript-container">
-    <div class="transcript-empty">
+    <div class="transcript-empty" id="empty-state">
       <div class="icon">🧑‍💻</div>
       <p>Set up a meeting on the left and press <strong>Start Meeting</strong>.</p>
     </div>
@@ -174,6 +211,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 let meetingId = null;
 let pollTimer = null;
 let agents = [];
+let meetingActive = false;
 
 // ── Init ──
 async function init() {
@@ -182,14 +220,16 @@ async function init() {
     agents = await res.json();
     renderAgentChips();
     renderModeratorSelect();
-  } catch(e) { showError('Failed to load agents. Is the server running?'); }
+  } catch(e) { showBanner('error', 'Failed to load agents. Is the server running?'); }
 
-  // Event listeners
   $('#btn-start').addEventListener('click', startMeeting);
-  $('#btn-cancel').addEventListener('click', cancelMeeting);
+  $('#btn-stop').addEventListener('click', showStopConfirm);
   $('#ctx-upload-btn').addEventListener('click', () => $('#ctx-file').click());
   $('#ctx-file').addEventListener('change', handleFileUpload);
   $$('#mode-toggle button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('#confirm-stop').addEventListener('click', confirmStop);
+  $('#confirm-cancel').addEventListener('click', hideStopConfirm);
+  $('#topic').addEventListener('input', updateStartButton);
 }
 
 // ── Agent chips ──
@@ -205,6 +245,7 @@ function renderAgentChips() {
 }
 
 function toggleAgent(chip) {
+  if (meetingActive) return;
   chip.classList.toggle('selected');
   updateStartButton();
 }
@@ -221,11 +262,10 @@ function renderModeratorSelect() {
 function updateStartButton() {
   const topic = $('#topic').value.trim();
   const selected = getSelectedAgents().length;
-  $('#btn-start').disabled = !topic || selected < 2;
+  $('#btn-start').disabled = meetingActive || !topic || selected < 2;
 }
 
-$('#topic').addEventListener('input', updateStartButton);
-// Re-check when chips change
+// Watch for chip changes
 new MutationObserver(updateStartButton).observe($('#agent-list'), { subtree: true, attributes: true, attributeFilter: ['class'] });
 
 // ── File upload ──
@@ -241,6 +281,7 @@ function handleFileUpload() {
 // ── Mode toggle ──
 function setMode(mode) {
   $$('#mode-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  $('#workdir-group').style.display = mode === 'collaboration' ? 'block' : 'none';
 }
 
 function getMode() {
@@ -253,12 +294,15 @@ async function startMeeting() {
   const context = $('#context').value.trim();
   const participantIds = getSelectedAgents();
   const moderatorId = $('#moderator').value;
+  const mode = getMode();
+  const workDir = $('#workdir').value.trim() || undefined;
 
   if (!topic || participantIds.length < 2) return;
 
-  $('#btn-start').disabled = true;
-  $('#btn-start').textContent = 'Starting...';
-  clearError();
+  const btn = $('#btn-start');
+  btn.classList.add('loading');
+  btn.querySelector('.btn-label').textContent = 'Starting...';
+  clearBanner();
 
   try {
     const res = await fetch('/meetings', {
@@ -266,41 +310,79 @@ async function startMeeting() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         topic, context, participantIds, moderatorId,
-        autoStart: true,
+        autoStart: true, workDir,
       }),
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
     const data = await res.json();
     meetingId = data.id;
+    meetingActive = true;
+    updateUIForActive();
     $('#meeting-title').textContent = topic;
     updateStatus('active');
-    $('#btn-cancel').disabled = false;
-    $('#btn-start').textContent = 'Start Meeting';
+    seenMessageCount = 0;
+    lastPhase = null;
+    $('#transcript-container').innerHTML = '';
+    showBanner('success', 'Meeting started — agents are responding...');
     startPolling();
   } catch(e) {
-    showError(e.message);
-    $('#btn-start').disabled = false;
-    $('#btn-start').textContent = 'Start Meeting';
+    showBanner('error', 'Failed to start: ' + escapeHtml(e.message));
+  } finally {
+    btn.classList.remove('loading');
+    btn.querySelector('.btn-label').textContent = 'Start Meeting';
+    updateStartButton();
   }
 }
 
-// ── Cancel meeting ──
-async function cancelMeeting() {
+function updateUIForActive() {
+  $('#btn-start').disabled = true;
+  $('#btn-stop').disabled = false;
+  $('#btn-stop').style.display = '';
+  // Disable agent selection changes
+  $$('.agent-chip').forEach(c => c.style.pointerEvents = 'none');
+  $('#topic').disabled = true;
+}
+
+function updateUIForIdle() {
+  $('#btn-start').disabled = false;
+  $('#btn-stop').disabled = true;
+  $('#btn-stop').style.display = 'none';
+  $$('.agent-chip').forEach(c => c.style.pointerEvents = '');
+  $('#topic').disabled = false;
+}
+
+// ── Stop meeting ──
+function showStopConfirm() {
+  $('#confirm-overlay').style.display = 'flex';
+}
+function hideStopConfirm() {
+  $('#confirm-overlay').style.display = 'none';
+}
+
+async function confirmStop() {
+  hideStopConfirm();
   if (!meetingId) return;
+
+  const btn = $('#btn-stop');
+  btn.disabled = true;
+  btn.textContent = 'Stopping...';
+
   try {
     await fetch(`/meetings/${meetingId}/cancel`, { method: 'POST' });
   } catch(e) { /* ignore */ }
+
   stopPolling();
-  updateStatus('idle');
-  $('#btn-cancel').disabled = true;
-  $('#btn-start').disabled = false;
-  meetingId = null;
+  updateStatus('cancelled');
+  meetingActive = false;
+  updateUIForIdle();
+  btn.textContent = 'Stop Meeting';
+  showBanner('info', 'Meeting stopped.');
 }
 
 // ── Polling ──
 function startPolling() {
   stopPolling();
-  pollTimer = setInterval(pollMeeting, 1000);
+  pollTimer = setInterval(pollMeeting, 1500);
   pollMeeting();
 }
 
@@ -334,11 +416,6 @@ async function pollMeeting() {
     const container = $('#transcript-container');
     const msgs = meeting.transcript || [];
 
-    // Remove empty state on first message
-    if (msgs.length > 0 && seenMessageCount === 0) {
-      container.innerHTML = '';
-    }
-
     // Render new messages
     for (let i = seenMessageCount; i < msgs.length; i++) {
       const msg = msgs[i];
@@ -354,12 +431,19 @@ async function pollMeeting() {
     }
     seenMessageCount = msgs.length;
 
+    if (msgs.length > 0) {
+      container.scrollTop = container.scrollHeight;
+    }
+
     // Meeting concluded
     if (meeting.status === 'concluded' || meeting.status === 'cancelled') {
       stopPolling();
-      $('#btn-cancel').disabled = true;
-      $('#btn-start').disabled = false;
+      meetingActive = false;
+      updateUIForIdle();
       if (meeting.summary) renderSummary(meeting.summary, meeting.mode);
+      if (meeting.status === 'concluded') {
+        showBanner('success', 'Meeting concluded — summary below.');
+      }
     }
   } catch(e) { /* retry next tick */ }
 }
@@ -367,7 +451,6 @@ async function pollMeeting() {
 function renderMessage(msg) {
   const div = document.createElement('div');
   div.className = msg.authorId === '__system_moderator__' ? 'msg system' : 'msg agent';
-
   const initial = (msg.authorName || '?')[0].toUpperCase();
   div.innerHTML = `
     <div class="msg-avatar">${initial}</div>
@@ -399,20 +482,20 @@ function renderSummary(s, mode) {
   }
   html += '</div>';
   container.insertAdjacentHTML('beforeend', html);
+  container.scrollTop = container.scrollHeight;
 }
 
 function updateStatus(status) {
   const el = $('#meeting-status');
   el.textContent = status;
   el.className = 'status ' + status;
-  if (status === 'concluded') $('#btn-cancel').disabled = true;
 }
 
-function showError(msg) {
-  const el = $('#error-container');
-  el.innerHTML = `<div class="error-banner">${escapeHtml(msg)}</div>`;
+function showBanner(type, msg) {
+  const el = $('#banner-container');
+  el.innerHTML = `<div class="banner banner-${type}">${escapeHtml(msg)}</div>`;
 }
-function clearError() { $('#error-container').innerHTML = ''; }
+function clearBanner() { $('#banner-container').innerHTML = ''; }
 
 function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

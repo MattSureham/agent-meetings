@@ -30,6 +30,7 @@ interface CreateMeetingBody {
   participantIds: string[];
   moderatorId?: string;
   autoStart?: boolean;
+  workDir?: string;
 }
 
 interface CreateAgentBody {
@@ -147,6 +148,7 @@ export function createRouter(
           context: body.context ?? '',
           participants,
           moderatorId,
+          workDir: body.workDir,
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationTurns: config.meetings.maxDeliberationTurns,
@@ -188,6 +190,15 @@ export function createRouter(
         }
 
         const meeting = await store.getMeeting(id);
+
+        // If the meeting is currently running, return live state from engine
+        const running = meetings.get(id);
+        if (running) {
+          const stored = running.engine.toStoredMeeting();
+          if (meeting) stored.summary = stored.summary ?? meeting.summary;
+          return json(res, 200, stored);
+        }
+
         if (!meeting) return json(res, 404, { error: 'Meeting not found' });
         return json(res, 200, meeting);
       }
