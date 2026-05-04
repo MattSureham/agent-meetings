@@ -74,6 +74,10 @@
   .status.concluded { background: #252830; color: #a1a5b0; }
   .status.cancelled { background: #2d1a1a; color: #fca5a5; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .waiting-indicator { display: flex; align-items: center; gap: 8px; padding: 10px 14px; color: #93c5fd; font-size: 13px; animation: pulse 2s infinite; }
+  .waiting-indicator .dot-pulse { width: 8px; height: 8px; background: #4f8fff; border-radius: 50%; animation: pulse 0.8s infinite; }
+  .status-bar { display: flex; align-items: center; gap: 10px; padding: 10px 24px; background: #1a2430; border-top: 1px solid #253350; color: #93c5fd; font-size: 13px; animation: pulse 2s infinite; flex-shrink: 0; }
+  .status-bar .dot-pulse { width: 8px; height: 8px; background: #4f8fff; border-radius: 50%; animation: pulse 0.8s infinite; flex-shrink: 0; }
   .main-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 4px; }
 
   .transcript-empty { text-align: center; padding: 80px 20px; color: #4a4d56; }
@@ -108,6 +112,10 @@
   .confirm-box { background: #1c1e26; border: 1px solid #3d3040; border-radius: 8px; padding: 24px; text-align: center; max-width: 320px; }
   .confirm-box p { margin-bottom: 16px; font-size: 15px; }
   .confirm-box .btn { margin: 0 6px; }
+.dir-entry { padding: 4px 8px; cursor: pointer; border-radius: 4px; font-size: 13px; color: #d4d4d8; display: flex; justify-content: space-between; align-items: center; }
+.dir-entry:hover { background: #252830; }
+.dir-entry .select-link { color: #4f8fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+.dir-entry .select-link:hover { background: #1a2740; }
 </style>
 </head>
 <body>
@@ -167,8 +175,19 @@
     </div>
 
     <div id="workdir-group">
-      <label for="workdir">Working Directory <span style="color:#6b7280;font-weight:400">(for collaboration — agents share this folder)</span></label>
-      <input type="text" id="workdir" placeholder="e.g. ./workspace/my-project">
+      <label>Working Directory <span style="color:#6b7280;font-weight:400">(for collaboration — agents share this folder)</span></label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="text" id="workdir" placeholder="e.g. ./workspace/my-project" style="flex:1">
+        <button class="btn btn-outline btn-sm" id="btn-browse" title="Browse folders">Browse</button>
+      </div>
+      <div id="dir-browser" style="display:none;margin-top:6px;background:#1c1e26;border:1px solid #2d3039;border-radius:6px;padding:8px;max-height:180px;overflow-y:auto">
+        <div id="dir-browser-path" style="font-size:11px;color:#6b7280;margin-bottom:6px;word-break:break-all"></div>
+        <div id="dir-browser-entries"></div>
+	        <div id="dir-browser-new" style="display:flex;gap:4px;margin-top:6px;border-top:1px solid #252830;padding-top:6px">
+	          <input type="text" id="dir-browser-new-name" placeholder="New folder name" style="flex:1;padding:5px 8px;font-size:12px">
+	          <button class="btn btn-outline btn-sm" id="btn-mkdir">Create</button>
+	        </div>
+      </div>
     </div>
 
     <div class="settings-grid">
@@ -202,6 +221,10 @@
       <p>Set up a meeting on the left and press <strong>Start Meeting</strong>.</p>
     </div>
   </div>
+  <div class="status-bar" id="status-bar" style="display:none">
+    <span class="dot-pulse"></span>
+    <span id="status-bar-text"></span>
+  </div>
 </div>
 
 <script>
@@ -230,6 +253,25 @@ async function init() {
   $('#confirm-stop').addEventListener('click', confirmStop);
   $('#confirm-cancel').addEventListener('click', hideStopConfirm);
   $('#topic').addEventListener('input', updateStartButton);
+  $('#btn-browse').addEventListener('click', toggleBrowser);
+  $('#btn-mkdir').addEventListener('click', createFolder);
+
+  // Restore meeting after page refresh
+  var savedId = sessionStorage.getItem('meetingId');
+  if (savedId) {
+    meetingId = savedId;
+    meetingActive = true;
+    updateUIForActive();
+    $('#meeting-title').textContent = sessionStorage.getItem('meetingTopic') || '';
+    updateStatus('active');
+    seenMessageCount = 0;
+    lastPhase = null;
+    startPolling();
+  }
+  $('#btn-mkdir').addEventListener('click', createFolder);
+  $('#dir-browser-new-name').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') createFolder();
+  });
 }
 
 // ── Agent chips ──
@@ -316,6 +358,8 @@ async function startMeeting() {
     const data = await res.json();
     meetingId = data.id;
     meetingActive = true;
+    sessionStorage.setItem('meetingId', meetingId);
+    sessionStorage.setItem('meetingTopic', topic);
     updateUIForActive();
     $('#meeting-title').textContent = topic;
     updateStatus('active');
@@ -371,6 +415,7 @@ async function confirmStop() {
   } catch(e) { /* ignore */ }
 
   stopPolling();
+  clearMeetingState();
   updateStatus('cancelled');
   meetingActive = false;
   updateUIForIdle();
@@ -430,16 +475,30 @@ async function pollMeeting() {
     }
     seenMessageCount = msgs.length;
 
-    if (msgs.length > 0) {
+    // Only auto-scroll if user is near the bottom (not reading history)
+    var atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+
+    if (msgs.length > 0 && atBottom) {
       container.scrollTop = container.scrollHeight;
+    }
+
+    // Show/hide status bar based on currentTurn
+    var bar = $('#status-bar');
+    if (meeting.status === 'active' && meeting.currentTurn) {
+      bar.style.display = 'flex';
+      var phaseLabel = PHASE_LABELS[meeting.currentPhase] || (meeting.currentPhase || '').toUpperCase();
+      $('#status-bar-text').textContent = phaseLabel + ' — Waiting for ' + meeting.currentTurn + ' to respond...';
+    } else {
+      bar.style.display = 'none';
     }
 
     // Meeting concluded
     if (meeting.status === 'concluded' || meeting.status === 'cancelled') {
       stopPolling();
+      clearMeetingState();
       meetingActive = false;
       updateUIForIdle();
-      if (meeting.summary) renderSummary(meeting.summary, meeting.mode);
+      if (meeting.summary) renderSummary(meeting.summary, meeting.mode, meeting);
       if (meeting.status === 'concluded') {
         showBanner('success', 'Meeting concluded — summary below.');
       }
@@ -451,13 +510,17 @@ function renderMessage(msg) {
   const div = document.createElement('div');
   div.className = msg.authorId === '__system_moderator__' ? 'msg system' : 'msg agent';
   const initial = (msg.authorName || '?')[0].toUpperCase();
+  let metaRight = new Date(msg.timestamp).toLocaleTimeString();
+  if (msg.durationMs != null) {
+    metaRight += ' &middot; took ' + formatDuration(msg.durationMs);
+  }
   div.innerHTML = `
     <div class="msg-avatar">${initial}</div>
     <div class="msg-body">
       <div class="msg-meta">
         <span class="msg-author">${escapeHtml(msg.authorName)}</span>
         <span class="msg-phase">${msg.phase}</span>
-        <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
+        <span>${metaRight}</span>
       </div>
       <div class="msg-content">${escapeHtml(msg.content)}</div>
     </div>
@@ -465,9 +528,20 @@ function renderMessage(msg) {
   return div;
 }
 
-function renderSummary(s, mode) {
+function formatDuration(ms) {
+  if (ms < 1000) return (ms / 1000).toFixed(1) + 's';
+  if (ms < 60000) return Math.round(ms / 1000) + 's';
+  var mins = Math.floor(ms / 60000);
+  var secs = Math.round((ms % 60000) / 1000);
+  return mins + 'm ' + secs + 's';
+}
+
+function renderSummary(s, mode, meeting) {
   const container = $('#transcript-container');
   let html = '<div class="summary-box"><h3>' + (mode === 'collaboration' ? 'Project Summary' : 'Meeting Summary') + '</h3>';
+  if (meeting && meeting.createdAt && meeting.concludedAt) {
+    html += '<p style="margin-bottom:12px;color:#6b7280;font-size:13px"><strong>Total duration:</strong> ' + formatDuration(meeting.concludedAt - meeting.createdAt) + '</p>';
+  }
   html += `<p style="margin-bottom:12px"><strong>Outcome:</strong> ${escapeHtml(s.consensus)}</p>`;
   if (s.keyPoints?.length) {
     html += '<p style="margin-bottom:4px"><strong>Key Points:</strong></p><ul>' + s.keyPoints.map(p => `<li>${escapeHtml(p)}</li>`).join('') + '</ul>';
@@ -495,6 +569,91 @@ function showBanner(type, msg) {
   el.innerHTML = `<div class="banner banner-${type}">${escapeHtml(msg)}</div>`;
 }
 function clearBanner() { $('#banner-container').innerHTML = ''; }
+
+// ── Directory browser ──
+function toggleBrowser() {
+  const panel = $('#dir-browser');
+  if (panel.style.display === 'none' || !panel.style.display) {
+    panel.style.display = 'block';
+    navigateBrowser($('#workdir').value.trim() || '');
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+async function navigateBrowser(path) {
+  try {
+    const url = '/fs/ls' + (path ? '?path=' + encodeURIComponent(path) : '');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Cannot read directory');
+    renderBrowser(await res.json());
+  } catch (e) {
+    $('#dir-browser-entries').innerHTML = '<div style="color:#fca5a5;font-size:12px;padding:4px">' + escapeHtml(e.message) + '</div>';
+    $('#dir-browser-path').textContent = path || '(current directory)';
+  }
+}
+
+function renderBrowser(data) {
+  $('#dir-browser-path').textContent = data.current;
+  let html = '';
+  if (data.parent && data.parent !== data.current) {
+    html += '<div class="dir-entry" data-action="navigate" data-path="' + escapeAttr(data.parent) + '">&larr; ..</div>';
+  }
+  if (!data.dirs || data.dirs.length === 0) {
+    html += '<div style="color:#6b7280;font-size:12px;padding:4px">No subdirectories</div>';
+  } else {
+    data.dirs.forEach(function (d) {
+      html += '<div class="dir-entry">'
+        + '<span data-action="navigate" data-path="' + escapeAttr(d.path) + '" style="flex:1">' + escapeHtml(d.name) + '/</span>'
+        + '<span class="select-link" data-action="select" data-path="' + escapeAttr(d.path) + '">Select</span>'
+        + '</div>';
+    });
+  }
+  $('#dir-browser-entries').innerHTML = html;
+
+  $$('#dir-browser-entries [data-action="navigate"]').forEach(function (el) {
+    el.addEventListener('click', function () { navigateBrowser(el.dataset.path); });
+  });
+  $$('#dir-browser-entries [data-action="select"]').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
+      selectWorkdir(el.dataset.path);
+    });
+  });
+}
+
+async function createFolder() {
+  const input = $('#dir-browser-new-name');
+  const name = input.value.trim();
+  if (!name) return;
+  const parent = $('#dir-browser-path').textContent || '';
+  try {
+    const res = await fetch('/fs/mkdir', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ parent, name }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    input.value = '';
+    navigateBrowser(parent);
+  } catch (e) {
+    showBanner('error', 'Cannot create folder: ' + escapeHtml(e.message));
+  }
+}
+
+function selectWorkdir(path) {
+  $('#workdir').value = path;
+  $('#dir-browser').style.display = 'none';
+}
+
+function escapeAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function clearMeetingState() {
+  sessionStorage.removeItem('meetingId');
+  sessionStorage.removeItem('meetingTopic');
+}
 
 function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

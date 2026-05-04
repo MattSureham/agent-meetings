@@ -57,6 +57,7 @@ export class MeetingEngine {
   private turnLimitReached = false;
   private totalTurns = 0;
   reasonEnded: 'completed' | 'turn_limit' | 'cancelled' = 'completed';
+  currentTurn: string | null = null;
 
   constructor(config: MeetingConfig) {
     this.id = randomUUID();
@@ -193,6 +194,8 @@ export class MeetingEngine {
       transcript: this.transcript,
       phaseTimeline: this.phaseTimeline,
       summary: this.summary,
+      currentTurn: this.currentTurn,
+      currentPhase: this.currentPhase,
       createdAt: this.createdAt,
       concludedAt: this.concludedAt,
     };
@@ -340,16 +343,26 @@ export class MeetingEngine {
       .map((m) => `[${m.authorName} (${m.phase})]: ${m.content}`)
       .join('\n\n');
 
-    const summary = await this.summarizer.summarize(
-      this.topic,
-      this.context,
-      this.transcript.map((m) => ({
-        authorName: m.authorName,
-        content: m.content,
-      })),
-      [...this.agents.values()],
-      this.mode
-    );
+    const summary = await Promise.race([
+      this.summarizer.summarize(
+        this.topic,
+        this.context,
+        this.transcript.map((m) => ({
+          authorName: m.authorName,
+          content: m.content,
+        })),
+        [...this.agents.values()],
+        this.mode
+      ),
+      new Promise<MeetingSummary>((resolve) =>
+        setTimeout(() => resolve({
+          consensus: 'Summary generation timed out.',
+          keyPoints: [],
+          dissentingViews: [],
+          actionItems: [],
+        }), this.turnTimeoutMs)
+      ),
+    ]);
 
     if (this.mode !== 'collaboration') {
       const voteTally = this.summarizer.parseVotes(
@@ -410,6 +423,7 @@ export class MeetingEngine {
 
   private async promptAgent(agent: IAgent, promptText: string): Promise<void> {
     this.totalTurns++;
+    this.currentTurn = agent.name;
     this.onTurnStart?.(agent.name);
 
     const transcriptMessages: TranscriptMessage[] = this.transcript.map((m) => ({
@@ -422,6 +436,7 @@ export class MeetingEngine {
     }));
 
     try {
+      const started = Date.now();
       const response = await agent.respond({
         meetingId: this.id,
         phase: this.currentPhase,
@@ -432,19 +447,21 @@ export class MeetingEngine {
         currentPrompt: promptText,
       });
 
-      this.addMessage(agent.id, agent.name, response.content);
-    } catch {
+      this.addMessage(agent.id, agent.name, response.content, Date.now() - started);
+    } catch (e) {
+      console.error(`[engine] ${agent.name} failed:`, e instanceof Error ? e.message : e);
       this.addMessage(
         agent.id,
         agent.name,
         `[${agent.name} encountered an error and could not respond]`
       );
     } finally {
+      this.currentTurn = null;
       this.onTurnEnd?.(agent.name);
     }
   }
 
-  private addMessage(authorId: string, authorName: string, content: string): void {
+  private addMessage(authorId: string, authorName: string, content: string, durationMs?: number): void {
     this.transcript.push({
       id: randomUUID(),
       authorId,
@@ -452,6 +469,7 @@ export class MeetingEngine {
       content,
       phase: this.currentPhase,
       timestamp: Date.now(),
+      durationMs,
     });
   }
 }

@@ -27,6 +27,7 @@ export interface Message {
   content: string;
   phase: MeetingPhase;
   timestamp: number;
+  durationMs?: number;
 }
 
 export interface PhaseTransition {
@@ -56,6 +57,8 @@ export interface StoredMeeting {
   transcript: Message[];
   phaseTimeline: PhaseTransition[];
   summary: MeetingSummary | null;
+  currentTurn: string | null;
+  currentPhase: string | null;
   createdAt: number;
   concludedAt: number | null;
 }

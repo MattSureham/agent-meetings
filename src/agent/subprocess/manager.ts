@@ -50,8 +50,12 @@ export class SubprocessManager {
       }, timeoutMs);
 
       if (opts.input) {
-        child.stdin?.write(opts.input);
-        child.stdin?.end();
+        const drain = !child.stdin!.write(opts.input);
+        if (drain) {
+          child.stdin!.once('drain', () => child.stdin!.end());
+        } else {
+          child.stdin!.end();
+        }
       } else {
         child.stdin?.end();
       }

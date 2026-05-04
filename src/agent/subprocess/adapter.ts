@@ -44,7 +44,32 @@ export class SubprocessAgent implements IAgent {
     if (this.config.promptMode === 'stdin') {
       return this.respondViaStdin(prompt, promptText);
     }
+
+    // Argument mode — if prompt is too large for the Windows command line, fall back to stdin
+    if (promptText.length > 28000) {
+      return this.respondViaStdinFallback(promptText);
+    }
     return this.respondViaArgs(prompt);
+  }
+
+  private async respondViaStdinFallback(promptText: string): Promise<AgentResponse> {
+    const args = this.config.args
+      .filter(a => a !== '{prompt}')
+      .map(a => a === '-p' ? '--print' : a.replace('{prompt}', ''));
+
+    const result = await this.manager.run({
+      command: this.config.command,
+      args,
+      cwd: this.config.cwd,
+      env: this.config.env,
+      timeoutMs: this.config.timeoutMs,
+      input: promptText,
+    });
+
+    if (result.timedOut) {
+      return { content: `[${this.name} did not respond within the time limit]` };
+    }
+    return { content: this.formatOutput(result.stdout, result.stderr) };
   }
 
   private replaceTokens(args: string[], prompt: MeetingPrompt, promptText: string, filePath?: string): string[] {

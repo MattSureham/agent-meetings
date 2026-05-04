@@ -44,7 +44,7 @@ agents:
     capabilities: [coding, building, debugging, testing, architecture]
     command: claude
     args: ["-p", "{prompt}", "--output-format", "text", "--permission-mode", "bypassPermissions", "--bare"]
-    timeoutMs: 1800000
+    timeoutMs: 3600000
 
   - id: openclaw
     name: "OpenClaw"

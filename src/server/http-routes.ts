@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
+import { join, extname, resolve, sep } from 'node:path';
 import type { AgentRegistry } from './agent-registry.js';
 import type { DataStore } from '../persistence/types.js';
 import { MeetingEngine } from '../meeting/engine.js';
@@ -69,6 +69,35 @@ export function createRouter(
           json(res, 404, { error: 'File not found' });
         }
         return;
+      }
+
+      if (method === 'GET' && path === '/fs/ls') {
+        const dirPath = url.searchParams.get('path') || process.cwd();
+        try {
+          const resolved = resolve(dirPath);
+          const entries = readdirSync(resolved, { withFileTypes: true });
+          const dirs = entries
+            .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+            .map(e => ({ name: e.name, path: join(resolved, e.name) }));
+          const parent = resolved.split(sep).slice(0, -1).join(sep) || sep;
+          return json(res, 200, { current: resolved, parent, dirs });
+        } catch {
+          return json(res, 400, { error: 'Cannot read directory' });
+        }
+      }
+
+      if (method === 'POST' && path === '/fs/mkdir') {
+        const body = await readBody<{ parent: string; name: string }>(req);
+        if (!body.parent || !body.name || body.name.includes('/') || body.name.includes('\\')) {
+          return json(res, 400, { error: 'parent and a valid name are required' });
+        }
+        try {
+          const newPath = join(resolve(body.parent), body.name);
+          mkdirSync(newPath);
+          return json(res, 201, { path: newPath });
+        } catch {
+          return json(res, 400, { error: 'Cannot create directory' });
+        }
       }
 
       if (method === 'GET' && path === '/health') {
