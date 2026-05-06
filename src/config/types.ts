@@ -43,8 +43,7 @@ export interface MeetingsConfig {
   mode: 'debate' | 'collaboration';
   turnTimeoutMs: number;
   maxRebuttalRounds: number;
-  maxDeliberationTurns: number;
-  maxTotalTurns: number;
+  maxDeliberationRounds: number;
   defaultModerator: string;
 }
 

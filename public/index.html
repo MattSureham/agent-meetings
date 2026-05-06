@@ -214,6 +214,7 @@
   <div class="main-header">
     <h2 id="meeting-title">No active meeting</h2>
     <span class="status idle" id="meeting-status">idle</span>
+    <a href="#" id="download-log" style="display:none;margin-left:12px;color:#7eb6ff;font-size:13px;text-decoration:none" onclick="downloadLog()">⬇ Download Log</a>
   </div>
   <div class="main-body" id="transcript-container">
     <div class="transcript-empty" id="empty-state">
@@ -262,6 +263,7 @@ async function init() {
     meetingId = savedId;
     meetingActive = true;
     updateUIForActive();
+    $('#download-log').style.display = 'inline';
     $('#meeting-title').textContent = sessionStorage.getItem('meetingTopic') || '';
     updateStatus('active');
     seenMessageCount = 0;
@@ -361,6 +363,7 @@ async function startMeeting() {
     sessionStorage.setItem('meetingId', meetingId);
     sessionStorage.setItem('meetingTopic', topic);
     updateUIForActive();
+    $('#download-log').style.display = 'inline';
     $('#meeting-title').textContent = topic;
     updateStatus('active');
     seenMessageCount = 0;
@@ -653,6 +656,11 @@ function escapeAttr(s) {
 function clearMeetingState() {
   sessionStorage.removeItem('meetingId');
   sessionStorage.removeItem('meetingTopic');
+}
+
+function downloadLog() {
+  if (!meetingId) return;
+  window.open('/meetings/' + meetingId + '/log', '_blank');
 }
 
 function escapeHtml(s) {

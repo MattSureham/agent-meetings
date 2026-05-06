@@ -116,14 +116,14 @@ describe('MeetingEngine', () => {
       context: '',
       participants: agents,
       turnTimeoutMs: 100,
-      maxDeliberationTurns: 1,
+      maxDeliberationRounds: 1,
       maxRebuttalRounds: 0,
     });
 
     expect(engine.status).toBe('pending');
   });
 
-  it('enforces maxTotalTurns and ends with turn_limit reason', async () => {
+  it('respects maxDeliberationRounds and completes all phases', async () => {
     const agents = [
       new MockAgent('a1', 'Alice', ['general']),
       new MockAgent('a2', 'Bob', ['general']),
@@ -131,20 +131,18 @@ describe('MeetingEngine', () => {
     ];
 
     const engine = new MeetingEngine({
-      topic: 'Test turn limits',
+      topic: 'Test deliberation rounds',
       context: '',
       participants: agents,
-      maxTotalTurns: 3,      // very tight limit — 3 turns means only opening + 2 positions
       maxRebuttalRounds: 0,
-      maxDeliberationTurns: 0,
+      maxDeliberationRounds: 1,  // only round 1 (everyone), no hand-raising rounds
     });
 
     await engine.start();
 
-    // The meeting should have concluded, even though it didn't finish all phases
+    // All phases should complete — no turn limit cutting the meeting short
     expect(engine.status).toBe('concluded');
-    expect(engine.reasonEnded).toBe('turn_limit');
-    expect(engine.totalTurns).toBeGreaterThanOrEqual(3);
+    expect(engine.reasonEnded).toBe('completed');
     expect(engine.summary).not.toBeNull();
     expect(engine.transcript.length).toBeGreaterThan(0);
   });

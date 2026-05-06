@@ -133,5 +133,7 @@ function validateConfig(config: Config): void {
 
   // Apply defaults
   config.meetings.mode = config.meetings.mode ?? 'debate';
-  config.meetings.maxTotalTurns = config.meetings.maxTotalTurns ?? 50;
+  config.meetings.maxRebuttalRounds = config.meetings.maxRebuttalRounds ?? 1;
+  config.meetings.maxDeliberationRounds = config.meetings.maxDeliberationRounds ?? 3;
+  config.meetings.turnTimeoutMs = config.meetings.turnTimeoutMs ?? 60_000;
 }

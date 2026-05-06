@@ -33,7 +33,7 @@ agents:
 meetings:
   turnTimeoutMs: 30000
   maxRebuttalRounds: 2
-  maxDeliberationTurns: 5
+  maxDeliberationRounds: 5
   defaultModerator: test-agent
 `.trim()
     );
@@ -94,7 +94,7 @@ agents:
 meetings:
   turnTimeoutMs: 30000
   maxRebuttalRounds: 1
-  maxDeliberationTurns: 5
+  maxDeliberationRounds: 5
   defaultModerator: same
 `.trim()
     );

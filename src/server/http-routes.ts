@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve, sep } from 'node:path';
 import type { AgentRegistry } from './agent-registry.js';
 import type { DataStore } from '../persistence/types.js';
 import { MeetingEngine } from '../meeting/engine.js';
+import { formatLog } from '../meeting/format-log.js';
 import type { Config } from '../config/types.js';
 import type { IAgent } from '../agent/types.js';
 
@@ -182,8 +183,7 @@ export function createRouter(
           workDir: body.workDir,
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
-          maxDeliberationTurns: config.meetings.maxDeliberationTurns,
-          maxTotalTurns: config.meetings.maxTotalTurns,
+          maxDeliberationRounds: config.meetings.maxDeliberationRounds,
           defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
         });
 
@@ -196,10 +196,30 @@ export function createRouter(
         if (autoStart) {
           running.running = engine.start().then(() => {
             store.saveMeeting(engine.toStoredMeeting()).catch(() => {});
+            saveMeetingLog(config.server.dataDir, engine);
           });
         }
 
         return json(res, 201, { id: engine.id, topic: engine.topic, status: engine.status });
+      }
+
+      if (method === 'GET' && path.startsWith('/meetings/') && path.endsWith('/log')) {
+        const id = path.slice('/meetings/'.length).replace('/log', '');
+        const logPath = join(config.server.dataDir, 'meetings', `${id}.log`);
+        // Prefer pre-written log file, but generate on-the-fly for active meetings
+        if (existsSync(logPath)) {
+          res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+          res.end(readFileSync(logPath, 'utf-8'));
+        } else {
+          const running = meetings.get(id);
+          if (running) {
+            res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+            res.end(formatLog(running.engine));
+          } else {
+            json(res, 404, { error: 'Meeting log not found' });
+          }
+        }
+        return;
       }
 
       if (method === 'GET' && path.startsWith('/meetings/')) {
@@ -253,8 +273,7 @@ export function createRouter(
           moderatorId: stored.moderatorId,
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
-          maxDeliberationTurns: config.meetings.maxDeliberationTurns,
-          maxTotalTurns: config.meetings.maxTotalTurns,
+          maxDeliberationRounds: config.meetings.maxDeliberationRounds,
           defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
         });
 
@@ -263,6 +282,7 @@ export function createRouter(
         engine.status = 'active';
         running.running = engine.start().then(() => {
           store.saveMeeting(engine.toStoredMeeting()).catch(() => {});
+          saveMeetingLog(config.server.dataDir, engine);
         });
 
         return json(res, 200, { id: engine.id, status: 'active' });
@@ -274,6 +294,7 @@ export function createRouter(
         if (running) {
           running.engine.cancel();
           await store.saveMeeting(running.engine.toStoredMeeting());
+          saveMeetingLog(config.server.dataDir, running.engine);
           return json(res, 200, { id, status: 'cancelled' });
         }
 
@@ -290,6 +311,16 @@ export function createRouter(
       json(res, 500, { error: 'Internal server error' });
     }
   };
+}
+
+function saveMeetingLog(dataDir: string, engine: MeetingEngine): void {
+  try {
+    const dir = join(dataDir, 'meetings');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${engine.id}.log`), formatLog(engine), 'utf-8');
+  } catch {
+    // best-effort — don't fail the request over log writing
+  }
 }
 
 function json(res: ServerResponse, status: number, body: unknown): void {

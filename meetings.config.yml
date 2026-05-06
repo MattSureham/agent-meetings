@@ -162,7 +162,6 @@ agents:
 meetings:
   mode: debate
   turnTimeoutMs: 60000
-  maxRebuttalRounds: 1
-  maxDeliberationTurns: 10
-  maxTotalTurns: 50
+  maxRebuttalRounds: 2
+  maxDeliberationRounds: 3
   defaultModerator: deepseek
