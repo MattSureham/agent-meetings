@@ -100,13 +100,18 @@ export class Moderator {
     return [
       `BUILD PHASE — "${topic}"`,
       '',
-      `You are ${agentName}. It's your turn to implement.`,
+      `You are ${agentName}. It's your turn to implement ONE piece of this project.`,
       '',
-      'Review what has been planned and what others have already built (see the transcript above).',
-      'Then produce concrete output — write code, create files, scaffold components, write docs.',
+      'IMPORTANT: Do NOT try to build the entire project. Other team members will handle other parts.',
+      '',
+      '1. Check the transcript above to see what has already been planned and built.',
+      `2. If files already exist in the working directory, read them first to understand the current state.`,
+      '3. Pick the NEXT logical piece that needs doing — one feature, one module, one component.',
+      '4. Implement just that piece. Write real code, create real files.',
+      '5. If the project already looks complete, say so and move on — do not rewrite working code.',
       workDirInfo,
       '',
-      'After your work is done, briefly summarize what you built so other team members can build on it.',
+      'After your work is done, briefly summarize the ONE thing you built so the next builder can pick up where you left off.',
     ].join('\n');
   }
 
