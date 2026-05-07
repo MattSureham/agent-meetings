@@ -1,5 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { execSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import type { Config, AgentDef } from './types.js';
 
@@ -20,8 +22,70 @@ function loadEnvFile(): void {
   }
 }
 
+function loadCcSwitchEnv(): void {
+  const dbPath = resolve(homedir(), '.cc-switch', 'cc-switch.db');
+  if (!existsSync(dbPath)) return;
+
+  try {
+    const raw = execSync(
+      `sqlite3 -readonly -json "${dbPath}" "SELECT id, app_type, name, settings_config FROM providers WHERE settings_config IS NOT NULL"`,
+      { encoding: 'utf-8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+    if (!raw.trim()) return;
+
+    const rows = JSON.parse(raw) as Array<{ id: string; app_type: string; name: string; settings_config: string }>;
+
+    for (const row of rows) {
+      try {
+        const cfg = JSON.parse(row.settings_config);
+        let key: string | null = null;
+        let baseUrl = '';
+
+        if (row.app_type === 'claude' && cfg.env?.ANTHROPIC_AUTH_TOKEN) {
+          key = cfg.env.ANTHROPIC_AUTH_TOKEN;
+          baseUrl = cfg.env.ANTHROPIC_BASE_URL ?? '';
+        } else if (row.app_type === 'openclaw' && cfg.apiKey) {
+          key = cfg.apiKey;
+          baseUrl = cfg.baseUrl ?? '';
+        } else {
+          continue;
+        }
+
+        if (!key) continue;
+
+        const envVar = guessEnvVar(baseUrl, row.name, row.id);
+        if (envVar && !(envVar in process.env)) {
+          process.env[envVar] = key;
+        }
+      } catch {
+        // skip malformed provider rows
+      }
+    }
+  } catch {
+    // cc-switch DB doesn't exist on this machine, or sqlite3 is not available
+  }
+}
+
+function guessEnvVar(baseUrl: string, name: string, id: string): string | null {
+  const url = baseUrl.toLowerCase();
+  const label = (name + ' ' + id).toLowerCase();
+
+  if (url.includes('deepseek') || label.includes('deepseek')) return 'DEEPSEEK_API_KEY';
+  if (url.includes('api.minimaxi.com')) return 'MINIMAX_CN_API_KEY';
+  if (url.includes('api.minimax.io') || url.includes('api.minimax.com') || label.includes('minimax')) return 'MINIMAX_API_KEY';
+  if (url.includes('api.kimi.com')) return 'KIMI_API_KEY';
+  if (url.includes('api.moonshot')) return 'MOONSHOT_API_KEY';
+  if (url.includes('qwen') || label.includes('qwen')) return 'QWEN_API_KEY';
+  if (url.includes('anthropic') || label.includes('claude')) return 'ANTHROPIC_API_KEY';
+  if (url.includes('openai') || label.includes('openai')) return 'OPENAI_API_KEY';
+  if (url.includes('generativelanguage') || label.includes('gemini')) return 'GEMINI_API_KEY';
+
+  return null;
+}
+
 export function loadConfig(path?: string): Config {
   loadEnvFile();
+  loadCcSwitchEnv();
   const configPath = resolve(path ?? './meetings.config.yml');
 
   if (!existsSync(configPath)) {
