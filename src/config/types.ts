@@ -26,6 +26,7 @@ export interface LLMAgentDef {
   model: string;
   apiKey: string;
   endpoint?: string;
+  vision?: boolean;
 }
 
 export interface BrowserAgentDef {

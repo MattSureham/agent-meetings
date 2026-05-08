@@ -155,7 +155,7 @@ export class AgentRegistry {
     if (cached) {
       adapter = cached;
     } else {
-      adapter = this.buildLLMAdapter(def.provider, def.model, def.apiKey, def.endpoint);
+      adapter = this.buildLLMAdapter(def.provider, def.model, def.apiKey, def.endpoint, def.vision);
       this.llmAdapterCache.set(cacheKey, adapter);
       this.llmAdapterCache.set(def.id, adapter);
     }
@@ -167,31 +167,54 @@ export class AgentRegistry {
     provider: string,
     model: string,
     apiKey: string,
-    endpoint?: string
+    endpoint?: string,
+    vision?: boolean
   ): LLMAdapter {
+    let adapter: LLMAdapter;
     switch (provider) {
       case 'anthropic':
-        return new AnthropicAdapter(apiKey, model);
+        adapter = new AnthropicAdapter(apiKey, model);
+        break;
       case 'openai':
-        return new OpenAIAdapter(apiKey, model);
+        adapter = new OpenAIAdapter(apiKey, model);
+        break;
       case 'gemini':
-        return new GeminiAdapter(apiKey, model);
+        adapter = new GeminiAdapter(apiKey, model);
+        break;
       case 'ollama':
-        return new OllamaAdapter(model, endpoint);
+        adapter = new OllamaAdapter(model, endpoint);
+        break;
       case 'openai-compat':
-        return new OpenAICompatAdapter(apiKey, model, endpoint ?? 'http://127.0.0.1:8000/v1');
+        adapter = new OpenAICompatAdapter(apiKey, model, endpoint ?? 'http://127.0.0.1:8000/v1', vision);
+        break;
       case 'deepseek':
-        return new DeepSeekAdapter(apiKey, model);
+        adapter = new DeepSeekAdapter(apiKey, model);
+        break;
       case 'minimax':
-        return new MinimaxAdapter(apiKey, model);
+        adapter = new MinimaxAdapter(apiKey, model);
+        break;
       case 'qwen':
-        return new QwenAdapter(apiKey, model);
+        adapter = new QwenAdapter(apiKey, model);
+        break;
       case 'kimi':
-        return new KimiAdapter(apiKey, model);
+        adapter = new KimiAdapter(apiKey, model);
+        break;
       case 'kimi-code':
-        return new KimiCodeAdapter(apiKey, model);
+        adapter = new KimiCodeAdapter(apiKey, model);
+        break;
       default:
         throw new Error(`Unknown LLM provider: ${provider}`);
     }
+    // Allow config to override adapter default
+    if (vision !== undefined && adapter.supportsVision !== vision) {
+      const origChat = adapter.chat.bind(adapter);
+      return {
+        provider: adapter.provider,
+        model: adapter.model,
+        supportsVision: vision,
+        chat: origChat,
+      };
+    }
+    return adapter;
   }
 }

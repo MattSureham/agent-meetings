@@ -74,6 +74,7 @@ agents:
     provider: deepseek
     model: deepseek-chat
     apiKey: "${DEEPSEEK_API_KEY}"
+    vision: true
 
   - id: deepseek-reasoner
     name: "DeepSeek Reasoner"
@@ -82,6 +83,7 @@ agents:
     provider: deepseek
     model: deepseek-reasoner
     apiKey: "${DEEPSEEK_API_KEY}"
+    vision: true
 
   - id: deepseek-v4-pro
     name: "DeepSeek V4 Pro"
@@ -90,6 +92,7 @@ agents:
     provider: deepseek
     model: deepseek-v4-pro
     apiKey: "${DEEPSEEK_API_KEY}"
+    vision: true
 
   - id: deepseek-v4-flash
     name: "DeepSeek V4 Flash"
@@ -98,6 +101,7 @@ agents:
     provider: deepseek
     model: deepseek-v4-flash
     apiKey: "${DEEPSEEK_API_KEY}"
+    vision: true
 
   - id: minimax
     name: "MiniMax"
@@ -114,6 +118,7 @@ agents:
     provider: minimax
     model: minimax-m2.7
     apiKey: "${MINIMAX_API_KEY}"
+    vision: true
 
   - id: qwen
     name: "Qwen 3.5"
@@ -122,6 +127,7 @@ agents:
     provider: qwen
     model: qwen-max
     apiKey: "${QWEN_API_KEY}"
+    vision: true
 
   - id: kimi
     name: "Kimi K2.6"
@@ -130,6 +136,7 @@ agents:
     provider: kimi
     model: kimi-latest
     apiKey: "${MOONSHOT_API_KEY}"
+    vision: true
 
   - id: kimi-code
     name: "Kimi Code"
