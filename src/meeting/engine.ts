@@ -16,6 +16,7 @@ import { Summarizer } from './summarizer.js';
 export interface MeetingConfig {
   topic: string;
   context: string;
+  contextImages?: { data: string; mimeType: string }[];
   participants: IAgent[];
   moderatorId?: string;
   mode?: 'debate' | 'collaboration';
@@ -32,6 +33,7 @@ export class MeetingEngine {
   readonly id: string;
   readonly topic: string;
   readonly context: string;
+  readonly contextImages: { data: string; mimeType: string }[];
   readonly participantIds: string[];
   readonly moderatorId: string;
   readonly mode: 'debate' | 'collaboration';
@@ -60,6 +62,7 @@ export class MeetingEngine {
     this.id = randomUUID();
     this.topic = config.topic;
     this.context = config.context;
+    this.contextImages = config.contextImages ?? [];
     this.moderatorId = config.moderatorId ?? '__system_moderator__';
     this.mode = config.mode ?? 'debate';
     this.turnTimeoutMs = config.turnTimeoutMs ?? 60_000;
@@ -151,10 +154,14 @@ export class MeetingEngine {
   }
 
   toStoredMeeting(): StoredMeeting {
+    let storedContext = this.context;
+    if (this.contextImages.length > 0) {
+      storedContext += `\n\n[${this.contextImages.length} image(s) included in context]`;
+    }
     return {
       id: this.id,
       topic: this.topic,
-      context: this.context,
+      context: storedContext,
       status: this.status,
       mode: this.mode,
       participantIds: this.participantIds,
@@ -185,9 +192,13 @@ export class MeetingEngine {
   }
 
   private async runOpening(): Promise<void> {
+    let context = this.context;
+    if (this.contextImages.length > 0) {
+      context += `\n\n[This meeting context includes ${this.contextImages.length} image(s). Vision-capable agents will receive them for analysis.]`;
+    }
     const openingText = this.moderator.buildOpeningPrompt(
       this.topic,
-      this.context,
+      context,
       [...this.agents.values()]
     );
     this.addMessage(this.moderator.systemModeratorId, this.moderator.systemModeratorName, openingText);
@@ -412,6 +423,9 @@ export class MeetingEngine {
         phase: this.currentPhase,
         topic: this.topic,
         background: this.context,
+        contextImages: agent.supportsVision && this.contextImages.length > 0
+          ? this.contextImages
+          : undefined,
         transcript: transcriptMessages,
         speakingOrder: this.participantIds,
         currentPrompt: promptText,

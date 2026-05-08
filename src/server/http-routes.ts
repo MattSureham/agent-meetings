@@ -179,6 +179,7 @@ export function createRouter(
         const engine = new MeetingEngine({
           topic: body.topic,
           context: body.context ?? '',
+          contextImages: body.contextImages,
           participants,
           moderatorId,
           mode: body.mode ?? config.meetings.mode,

@@ -12,6 +12,10 @@ export class LLMAgent implements IAgent {
     private adapter: LLMAdapter
   ) {}
 
+  get supportsVision(): boolean {
+    return this.adapter.supportsVision ?? false;
+  }
+
   async respond(prompt: MeetingPrompt): Promise<AgentResponse> {
     const systemPrompt = this.buildSystemPrompt(prompt);
     const messages: ChatMessage[] = [

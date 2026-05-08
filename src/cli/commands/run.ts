@@ -128,6 +128,7 @@ export function runCommand(): Command {
       const engine = new MeetingEngine({
         topic: options.topic,
         context,
+        contextImages: contextImages.length > 0 ? contextImages : undefined,
         participants,
         moderatorId,
         mode: mode as 'debate' | 'collaboration',
