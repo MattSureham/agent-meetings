@@ -1,7 +1,9 @@
-import type { ChatMessage, LLMAdapter } from './types.js';
+import type { ChatMessage, LLMAdapter, ContentBlock } from './types.js';
+import { getTextContent } from './types.js';
 
 export class AnthropicAdapter implements LLMAdapter {
   readonly provider = 'anthropic';
+  readonly supportsVision = true;
 
   constructor(
     private apiKey: string,
@@ -22,10 +24,10 @@ export class AnthropicAdapter implements LLMAdapter {
       body: JSON.stringify({
         model: this.model,
         max_tokens: 4096,
-        ...(systemMsg ? { system: systemMsg.content } : {}),
+        ...(systemMsg ? { system: getTextContent(systemMsg.content) } : {}),
         messages: chatMessages.map((m) => ({
           role: m.role,
-          content: m.content,
+          content: toAnthropicContent(m.content),
         })),
       }),
     });
@@ -41,4 +43,27 @@ export class AnthropicAdapter implements LLMAdapter {
 
     return data.content.map((c) => c.text).join('');
   }
+}
+
+function toAnthropicContent(
+  content: string | ContentBlock[]
+): string | Record<string, unknown>[] {
+  if (typeof content === 'string') return content;
+  return content.map((block): Record<string, unknown> => {
+    if (block.type === 'text') {
+      return { type: 'text', text: block.text };
+    }
+    const url = block.image_url.url;
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return {
+        type: 'image',
+        source: { type: 'base64', media_type: match[1], data: match[2] },
+      };
+    }
+    return {
+      type: 'image',
+      source: { type: 'url', url },
+    };
+  });
 }

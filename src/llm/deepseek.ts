@@ -2,6 +2,7 @@ import type { ChatMessage, LLMAdapter } from './types.js';
 
 export class DeepSeekAdapter implements LLMAdapter {
   readonly provider = 'deepseek';
+  readonly supportsVision = true;
 
   constructor(
     private apiKey: string,

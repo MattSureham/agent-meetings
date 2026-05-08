@@ -2,6 +2,7 @@ import type { ChatMessage, LLMAdapter } from './types.js';
 
 export class OpenAIAdapter implements LLMAdapter {
   readonly provider = 'openai';
+  readonly supportsVision = true;
 
   constructor(
     private apiKey: string,

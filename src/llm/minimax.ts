@@ -2,6 +2,7 @@ import type { ChatMessage, LLMAdapter } from './types.js';
 
 export class MinimaxAdapter implements LLMAdapter {
   readonly provider = 'minimax';
+  readonly supportsVision = true;
 
   constructor(
     private apiKey: string,

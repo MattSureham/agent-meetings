@@ -2,6 +2,7 @@ import type { ChatMessage, LLMAdapter } from './types.js';
 
 export class QwenAdapter implements LLMAdapter {
   readonly provider = 'qwen';
+  readonly supportsVision = true;
 
   constructor(
     private apiKey: string,

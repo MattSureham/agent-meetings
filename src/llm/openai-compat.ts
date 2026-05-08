@@ -2,12 +2,16 @@ import type { ChatMessage, LLMAdapter } from './types.js';
 
 export class OpenAICompatAdapter implements LLMAdapter {
   readonly provider = 'openai-compat';
+  readonly supportsVision: boolean;
 
   constructor(
     private apiKey: string,
     readonly model: string,
-    private endpoint: string = 'http://127.0.0.1:8000/v1'
-  ) {}
+    private endpoint: string = 'http://127.0.0.1:8000/v1',
+    supportsVision: boolean = false
+  ) {
+    this.supportsVision = supportsVision;
+  }
 
   async chat(messages: ChatMessage[]): Promise<string> {
     const response = await fetch(

@@ -2,6 +2,7 @@ import type { ChatMessage, LLMAdapter } from './types.js';
 
 export class KimiAdapter implements LLMAdapter {
   readonly provider = 'kimi';
+  readonly supportsVision = true;
 
   constructor(
     private apiKey: string,
