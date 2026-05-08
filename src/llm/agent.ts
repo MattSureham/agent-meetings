@@ -1,5 +1,5 @@
 import type { IAgent, AgentHealth, AgentResponse, MeetingPrompt } from '../agent/types.js';
-import type { LLMAdapter, ChatMessage } from './types.js';
+import type { LLMAdapter, ChatMessage, ContentBlock } from './types.js';
 import type { DebatePhase } from '../meeting/types.js';
 
 export class LLMAgent implements IAgent {
@@ -13,14 +13,29 @@ export class LLMAgent implements IAgent {
   ) {}
 
   async respond(prompt: MeetingPrompt): Promise<AgentResponse> {
+    const systemPrompt = this.buildSystemPrompt(prompt);
     const messages: ChatMessage[] = [
-      { role: 'system', content: this.buildSystemPrompt(prompt) },
+      { role: 'system', content: systemPrompt },
       ...this.transcriptToMessages(prompt.transcript),
-      { role: 'user', content: prompt.currentPrompt },
     ];
 
-    const content = await this.adapter.chat(messages);
-    return { content };
+    // Build the user message — with images if available and adapter supports vision
+    const hasVision = this.adapter.supportsVision && prompt.contextImages?.length;
+    if (hasVision && prompt.contextImages) {
+      const content: ContentBlock[] = [
+        { type: 'text', text: prompt.currentPrompt },
+        ...prompt.contextImages.map((img): ContentBlock => ({
+          type: 'image_url',
+          image_url: { url: img.data },
+        })),
+      ];
+      messages.push({ role: 'user', content });
+    } else {
+      messages.push({ role: 'user', content: prompt.currentPrompt });
+    }
+
+    const text = await this.adapter.chat(messages);
+    return { content: text };
   }
 
   async health(): Promise<AgentHealth> {
@@ -38,10 +53,13 @@ export class LLMAgent implements IAgent {
   }
 
   private buildSystemPrompt(prompt: MeetingPrompt): string {
+    const imageNote = prompt.contextImages?.length
+      ? `\nThe context for this meeting includes ${prompt.contextImages.length} image(s). Examine them closely — they are attached to this message.`
+      : '';
     return [
       `You are "${this.name}", an AI agent participating in a structured meeting.`,
       `Meeting topic: "${prompt.topic}"`,
-      `Background context: ${prompt.background || 'None provided.'}`,
+      `Background context: ${prompt.background || 'None provided.'}${imageNote}`,
       `Current phase: ${prompt.phase.toUpperCase()}`,
       `Your capabilities: ${this.capabilities.join(', ') || 'general reasoning'}`,
       '',

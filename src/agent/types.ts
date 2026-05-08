@@ -12,6 +12,7 @@ export interface MeetingPrompt {
   phase: DebatePhase;
   topic: string;
   background: string;
+  contextImages?: { data: string; mimeType: string }[];
   transcript: TranscriptMessage[];
   speakingOrder: string[];
   currentPrompt: string;
