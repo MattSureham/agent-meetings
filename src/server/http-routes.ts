@@ -149,12 +149,13 @@ export function createRouter(
 
       if (method === 'GET' && path === '/meetings') {
         const status = url.searchParams.get('status');
+        const limit = parseInt(url.searchParams.get('limit') ?? '', 10) || 0;
         const list = await store.listMeetings(
           status
             ? { status: status as 'active' | 'concluded' | 'pending' | 'cancelled' }
             : undefined
         );
-        return json(res, 200, list);
+        return json(res, 200, limit > 0 ? list.slice(0, limit) : list);
       }
 
       if (method === 'POST' && path === '/meetings') {

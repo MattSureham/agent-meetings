@@ -48,6 +48,11 @@
   .settings-grid label { margin-bottom: 3px; font-size: 12px; }
   .settings-grid input, .settings-grid select { padding: 7px 10px; font-size: 13px; }
 
+  .past-meeting-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; margin-bottom: 4px; }
+  .past-meeting-item:hover { background: #1f2330; border-color: #2d3039; }
+  .past-meeting-item .pm-topic { font-size: 13px; color: #e4e4e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .past-meeting-item .pm-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
   .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
   .btn-primary { background: #4f8fff; color: #fff; flex: 1; }
   .btn-primary:hover { background: #3d7ae8; }
@@ -218,6 +223,13 @@
         Stop Meeting
       </button>
     </div>
+
+    <div class="past-meetings" id="past-meetings-section">
+      <label style="margin-top:16px">Past Meetings</label>
+      <div id="past-meetings-list" style="margin-top:4px">
+        <span style="color:#4a4d56;font-size:12px">Loading...</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -258,6 +270,8 @@ async function init() {
     renderAgentChips();
     renderModeratorSelect();
   } catch(e) { showBanner('error', 'Failed to load agents. Is the server running?'); }
+
+  loadPastMeetings();
 
   $('#btn-start').addEventListener('click', startMeeting);
   $('#btn-stop').addEventListener('click', showStopConfirm);
@@ -743,6 +757,52 @@ function saveSnapshot() {
 
 function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function loadPastMeetings() {
+  try {
+    var res = await fetch('/meetings?status=concluded&limit=10');
+    if (!res.ok) return;
+    var meetings = await res.json();
+    var container = $('#past-meetings-list');
+    if (!meetings.length) {
+      container.innerHTML = '<span style="color:#4a4d56;font-size:12px">No meetings yet</span>';
+      return;
+    }
+    container.innerHTML = meetings.map(function(m) {
+      var date = new Date(m.createdAt).toLocaleDateString();
+      var topic = m.topic.length > 50 ? m.topic.slice(0,50) + '...' : m.topic;
+      var count = (m.participantIds || []).length;
+      return '<div class="past-meeting-item" onclick="viewPastMeeting(\'' + m.id + '\')">'
+        + '<div class="pm-topic">' + escapeHtml(topic) + '</div>'
+        + '<div class="pm-meta">' + date + ' &middot; ' + count + ' participants &middot; ' + m.mode + '</div>'
+        + '</div>';
+    }).join('');
+  } catch(e) { /* ignore */ }
+}
+
+function viewPastMeeting(id) {
+  fetch('/meetings/' + id).then(function(r) { return r.json(); }).then(function(meeting) {
+    var container = $('#transcript-container');
+    container.innerHTML = '';
+    lastPhase = null;
+    var msgs = meeting.transcript || [];
+    for (var i = 0; i < msgs.length; i++) {
+      var msg = msgs[i];
+      if (msg.phase !== lastPhase) {
+        lastPhase = msg.phase;
+        var div = document.createElement('div');
+        div.className = 'phase-divider';
+        div.textContent = PHASE_LABELS[msg.phase] || msg.phase.toUpperCase();
+        container.appendChild(div);
+      }
+      container.appendChild(renderMessage(msg));
+    }
+    if (meeting.summary) renderSummary(meeting.summary, meeting.mode, meeting);
+    container.scrollTop = 0;
+    $('#meeting-title').textContent = meeting.topic;
+    updateStatus(meeting.status);
+  }).catch(function() {});
 }
 
 init();
