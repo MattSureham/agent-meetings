@@ -1,5 +1,6 @@
 import { Command } from 'commander';
-import { readFileSync } from 'node:fs';
+import { loadContext } from '../../utils/context-loader.js';
+import { existsSync } from 'node:fs';
 
 export function scheduleCommand(): Command {
   return new Command('schedule')
@@ -15,13 +16,15 @@ export function scheduleCommand(): Command {
       const participantIds = options.agents.split(',').map((s: string) => s.trim());
       const moderatorId = options.moderator;
       let context = options.context ?? '';
+      let contextImages: { data: string; mimeType: string }[] = [];
 
-      // If context looks like a file path, read it
-      if (context && !context.includes('\n')) {
-        try {
-          context = readFileSync(context, 'utf-8');
-        } catch {
-          // treat as literal text
+      if (options.context) {
+        const cp = await loadContext(options.context);
+        context = cp.text;
+        contextImages = cp.images.map((img) => ({ data: img.data, mimeType: img.mimeType }));
+        if (cp.images.length > 0 || existsSync(options.context)) {
+          const label = existsSync(options.context) ? options.context : 'context';
+          console.error(`Loaded ${cp.text.length} chars + ${cp.images.length} image(s) from ${label}`);
         }
       }
 
@@ -34,6 +37,7 @@ export function scheduleCommand(): Command {
             participantIds,
             moderatorId,
             context,
+            contextImages: contextImages.length > 0 ? contextImages : undefined,
             autoStart: options.autoStart,
           }),
         });

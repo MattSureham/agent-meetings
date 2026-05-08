@@ -28,6 +28,7 @@ interface RunningMeeting {
 interface CreateMeetingBody {
   topic: string;
   context?: string;
+  contextImages?: { data: string; mimeType: string }[];
   participantIds: string[];
   moderatorId?: string;
   autoStart?: boolean;

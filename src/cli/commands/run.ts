@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from '../../config/loader.js';
 import { AgentRegistry } from '../../server/agent-registry.js';
@@ -7,6 +7,7 @@ import { JsonFileStore } from '../../persistence/json-store.js';
 import { MeetingEngine } from '../../meeting/engine.js';
 import { formatLog } from '../../meeting/format-log.js';
 import type { IAgent } from '../../agent/types.js';
+import { loadContext } from '../../utils/context-loader.js';
 
 export function runCommand(): Command {
   return new Command('run')
@@ -32,13 +33,16 @@ export function runCommand(): Command {
         process.exit(1);
       }
 
-      // Resolve context
-      let context = options.context ?? '';
-      if (context && !context.includes('\n')) {
-        try {
-          context = readFileSync(context, 'utf-8');
-        } catch {
-          // treat as literal text
+      // Resolve context — supports text, PDF, DOCX, images, directories
+      let context = '';
+      let contextImages: { data: string; mimeType: string }[] = [];
+      if (options.context) {
+        const cp = await loadContext(options.context);
+        context = cp.text;
+        contextImages = cp.images.map((img) => ({ data: img.data, mimeType: img.mimeType }));
+        if (cp.images.length > 0 || existsSync(options.context)) {
+          const label = existsSync(options.context) ? options.context : 'context';
+          console.error(`Loaded ${cp.text.length} chars + ${cp.images.length} image(s) from ${label}`);
         }
       }
 

@@ -160,7 +160,7 @@
       <textarea id="context" class="tall" placeholder="Background information, constraints, or goals..."></textarea>
       <div class="file-upload" style="margin-top:6px">
         <button class="btn btn-outline btn-sm" id="ctx-upload-btn">Upload file</button>
-        <input type="file" id="ctx-file" accept=".txt,.md,.json,.yaml,.yml">
+        <input type="file" id="ctx-file" accept=".txt,.md,.json,.yaml,.yml,.pdf,.docx,.png,.jpg,.jpeg,.gif,.webp">
         <span class="file-name" id="ctx-file-name">No file selected</span>
       </div>
     </div>
@@ -378,10 +378,21 @@ new MutationObserver(updateStartButton).observe($('#agent-list'), { subtree: tru
 function handleFileUpload() {
   const file = $('#ctx-file').files[0];
   if (!file) return;
-  $('#ctx-file-name').textContent = file.name;
+  const isImage = /\.(png|jpe?g|gif|webp)$/i.test(file.name);
+  $('#ctx-file-name').textContent = file.name + (isImage ? ' (image — will be analyzed by vision-capable agents)' : '');
   const reader = new FileReader();
-  reader.onload = () => { $('#context').value = reader.result; };
-  reader.readAsText(file);
+  reader.onload = () => {
+    if (isImage) {
+      // Insert base64 data URI into context textarea
+      const current = $('#context').value.trim();
+      const imgTag = current ? current + '\n\n' + reader.result : reader.result;
+      $('#context').value = imgTag;
+    } else {
+      $('#context').value = reader.result;
+    }
+  };
+  if (isImage) { reader.readAsDataURL(file); }
+  else { reader.readAsText(file); }
 }
 
 // ── Mode toggle ──
