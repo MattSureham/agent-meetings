@@ -267,6 +267,18 @@ async function init() {
   $('#confirm-stop').addEventListener('click', confirmStop);
   $('#confirm-cancel').addEventListener('click', hideStopConfirm);
   $('#topic').addEventListener('input', updateStartButton);
+  $('#topic').addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !meetingActive && !$('#btn-start').disabled) {
+      e.preventDefault();
+      startMeeting();
+    }
+  });
+  $('#context').addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !meetingActive && !$('#btn-start').disabled) {
+      e.preventDefault();
+      startMeeting();
+    }
+  });
   $('#btn-browse').addEventListener('click', toggleBrowser);
   $('#btn-mkdir').addEventListener('click', createFolder);
 
