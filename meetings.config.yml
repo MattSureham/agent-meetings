@@ -165,3 +165,13 @@ meetings:
   maxRebuttalRounds: 2
   maxDeliberationRounds: 3
   defaultModerator: deepseek
+
+  presets:
+    debate:
+      agents: [deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi]
+    thinkers:
+      agents: [deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi, deepseek-web]
+    builders:
+      agents: [claude-code, hermes]
+    all:
+      agents: [chatgpt, claude-web, gemini-web, deepseek-web, claude-code, hermes, deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi]

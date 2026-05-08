@@ -12,7 +12,8 @@ export function runCommand(): Command {
   return new Command('run')
     .description('Run a meeting — one command, no server needed')
     .requiredOption('-t, --topic <topic>', 'Meeting topic')
-    .requiredOption('-a, --agents <ids>', 'Comma-separated agent IDs from your config')
+    .option('-a, --agents <ids>', 'Comma-separated agent IDs from your config')
+    .option('--preset <name>', 'Use a named preset from config (merges with --agents if both given)')
     .option('-m, --moderator <id>', 'Agent ID to act as moderator')
     .option('-x, --context <text>', 'Background context (text or path to a file)')
     .option('-c, --config <path>', 'Path to config file', './meetings.config.yml')
@@ -41,8 +42,43 @@ export function runCommand(): Command {
         }
       }
 
-      // Resolve agents
-      const requestedIds = options.agents.split(',').map((s: string) => s.trim());
+      // Resolve agents — from preset, explicit --agents, or both
+      if (!options.agents && !options.preset) {
+        console.error('Either --agents or --preset is required (or both).');
+        if (config.meetings.presets) {
+          console.error('Available presets:');
+          for (const name of Object.keys(config.meetings.presets).sort()) {
+            const p = config.meetings.presets[name];
+            console.error(`  ${name} → ${p.agents.join(', ')}${p.moderator ? ` [moderator: ${p.moderator}]` : ''}`);
+          }
+        }
+        process.exit(1);
+      }
+
+      const requestedIds = new Set<string>();
+
+      // Load preset agents first
+      if (options.preset) {
+        const preset = config.meetings.presets?.[options.preset];
+        if (!preset) {
+          console.error(`Preset "${options.preset}" not found in config. Available presets:`);
+          if (config.meetings.presets) {
+            for (const name of Object.keys(config.meetings.presets).sort()) {
+              console.error(`  ${name}`);
+            }
+          }
+          process.exit(1);
+        }
+        for (const id of preset.agents) requestedIds.add(id);
+      }
+
+      // Merge explicit --agents (after preset, so they can add extras)
+      if (options.agents) {
+        for (const id of options.agents.split(',').map((s: string) => s.trim())) {
+          requestedIds.add(id);
+        }
+      }
+
       const registry = new AgentRegistry(new JsonFileStore(config.server.dataDir));
       await registry.boot(config);
 
@@ -60,7 +96,10 @@ export function runCommand(): Command {
         participants.push(agent);
       }
 
-      const moderatorId = options.moderator ?? config.meetings.defaultModerator;
+      const presetModerator = options.preset
+        ? config.meetings.presets?.[options.preset]?.moderator
+        : undefined;
+      const moderatorId = options.moderator ?? presetModerator ?? config.meetings.defaultModerator;
       const moderatorAgent = registry.get(moderatorId);
 
       console.log('╔══════════════════════════════════════════════╗');

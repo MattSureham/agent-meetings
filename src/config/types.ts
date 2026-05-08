@@ -45,6 +45,7 @@ export interface MeetingsConfig {
   maxRebuttalRounds: number;
   maxDeliberationRounds: number;
   defaultModerator: string;
+  presets?: Record<string, { agents: string[]; moderator?: string }>;
 }
 
 export interface Config {
