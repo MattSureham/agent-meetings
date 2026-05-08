@@ -7,6 +7,7 @@ import { MeetingEngine } from '../meeting/engine.js';
 import { formatLog } from '../meeting/format-log.js';
 import type { Config } from '../config/types.js';
 import type { IAgent } from '../agent/types.js';
+import { parseInlineContext } from '../utils/context-loader.js';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -176,10 +177,22 @@ export function createRouter(
 
         const moderatorId = body.moderatorId ?? config.meetings.defaultModerator;
 
+        // Process context for inline data URIs (images, PDFs, DOCX from web UI uploads)
+        let contextText = body.context ?? '';
+        let contextImages = body.contextImages ?? [];
+        if (contextText.includes('data:')) {
+          const parsed = await parseInlineContext(contextText);
+          contextText = parsed.text;
+          // Merge server-processed images with any client-sent ones
+          if (parsed.images.length > 0) {
+            contextImages = [...contextImages, ...parsed.images];
+          }
+        }
+
         const engine = new MeetingEngine({
           topic: body.topic,
-          context: body.context ?? '',
-          contextImages: body.contextImages,
+          context: contextText,
+          contextImages: contextImages.length > 0 ? contextImages : undefined,
           participants,
           moderatorId,
           mode: body.mode ?? config.meetings.mode,

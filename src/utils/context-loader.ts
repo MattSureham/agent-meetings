@@ -202,6 +202,131 @@ function detectImageMime(data: Uint8Array): string {
   return 'image/png';
 }
 
+export async function loadContextFromData(
+  data: Buffer,
+  filename: string,
+  mimeType?: string
+): Promise<ContextPayload> {
+  const ext = extname(filename).toLowerCase();
+
+  if (TEXT_EXTENSIONS.has(ext)) {
+    return { text: data.toString('utf-8'), images: [] };
+  }
+
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    const mime = mimeType ?? MIME_BY_EXT[ext] ?? 'application/octet-stream';
+    const b64 = data.toString('base64');
+    return {
+      text: '',
+      images: [{ data: `data:${mime};base64,${b64}`, mimeType: mime, source: filename }],
+    };
+  }
+
+  if (ext === '.pdf') {
+    return loadPdfFromBuffer(data, filename);
+  }
+
+  if (ext === '.docx') {
+    return loadDocxFromBuffer(data);
+  }
+
+  // Unknown — try as text
+  try {
+    return { text: data.toString('utf-8'), images: [] };
+  } catch {
+    throw new Error(`Unsupported file type: ${ext || 'no extension'}`);
+  }
+}
+
+async function loadPdfFromBuffer(data: Buffer, source: string): Promise<ContextPayload> {
+  const { getDocument } = await import('pdfjs-dist');
+  const pdfDoc = await getDocument({ data: new Uint8Array(data), useWorkerFetch: false }).promise;
+
+  const textParts: string[] = [];
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (pageText) textParts.push(pageText);
+  }
+
+  return { text: textParts.join('\n\n'), images: [] };
+}
+
+async function loadDocxFromBuffer(buf: Buffer): Promise<ContextPayload> {
+  const mammoth = await import('mammoth');
+  const images: ContextImage[] = [];
+
+  const result = await mammoth.convertToHtml(
+    { buffer: buf },
+    {
+      convertImage: mammoth.images.imgElement((element: { contentType: string; read: () => Promise<Buffer> }) => {
+        const mimeType = element.contentType ?? 'image/png';
+        return element.read().then((imgBuf) => {
+          const b64 = imgBuf.toString('base64');
+          images.push({ data: `data:${mimeType};base64,${b64}`, mimeType });
+          return { src: `data:${mimeType};base64,${b64}` };
+        });
+      }),
+    }
+  );
+
+  const text = result.value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return { text, images };
+}
+
+const DATA_URI_RE = /data:([^;]+);base64,([A-Za-z0-9+/=]+)/g;
+
+export async function parseInlineContext(raw: string): Promise<ContextPayload> {
+  const images: ContextImage[] = [];
+  let text = raw;
+  const dataUris: Array<{ mime: string; data: Buffer }> = [];
+
+  for (const match of raw.matchAll(DATA_URI_RE)) {
+    const mime = match[1];
+    const b64 = match[2];
+    try {
+      const data = Buffer.from(b64, 'base64');
+      if (mime.startsWith('image/')) {
+        images.push({ data: match[0], mimeType: mime });
+        text = text.replace(match[0], `[Image: ${mime}]`);
+      } else if (mime === 'application/pdf' || mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        dataUris.push({ mime, data });
+        text = text.replace(match[0], '');
+      }
+    } catch {
+      // skip malformed base64
+    }
+  }
+
+  // Process document data URIs
+  for (const { mime, data } of dataUris) {
+    try {
+      const ext = mime === 'application/pdf' ? '.pdf' : '.docx';
+      const result = await loadContextFromData(data, `upload${ext}`, mime);
+      if (result.text) text = (text + '\n\n' + result.text).trim();
+      images.push(...result.images);
+    } catch {
+      // skip unprocessable documents
+    }
+  }
+
+  return { text: text.trim(), images };
+}
+
 export async function loadContext(source: string): Promise<ContextPayload> {
   const trimmed = source.trim();
   if (!trimmed) return { text: '', images: [] };

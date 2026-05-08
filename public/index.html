@@ -379,19 +379,24 @@ function handleFileUpload() {
   const file = $('#ctx-file').files[0];
   if (!file) return;
   const isImage = /\.(png|jpe?g|gif|webp)$/i.test(file.name);
-  $('#ctx-file-name').textContent = file.name + (isImage ? ' (image — will be analyzed by vision-capable agents)' : '');
+  const isDoc = /\.(pdf|docx)$/i.test(file.name);
+  const label = isImage ? ' (image — analyzed by vision agents)' : isDoc ? ' (document — extracted server-side)' : '';
+  $('#ctx-file-name').textContent = file.name + label;
   const reader = new FileReader();
   reader.onload = () => {
-    if (isImage) {
-      // Insert base64 data URI into context textarea
-      const current = $('#context').value.trim();
-      const imgTag = current ? current + '\n\n' + reader.result : reader.result;
-      $('#context').value = imgTag;
+    const current = $('#context').value.trim();
+    if (isImage || isDoc) {
+      // Send as data URI (image) or base64-encoded document
+      const dataUri = isDoc
+        ? `data:${file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')};base64,${btoa(String.fromCharCode(...new Uint8Array(reader.result)))}\n\n`
+        : reader.result;
+      $('#context').value = current ? current + '\n\n' + dataUri : dataUri;
     } else {
       $('#context').value = reader.result;
     }
   };
   if (isImage) { reader.readAsDataURL(file); }
+  else if (isDoc) { reader.readAsArrayBuffer(file); }
   else { reader.readAsText(file); }
 }
 
