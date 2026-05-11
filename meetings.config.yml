@@ -55,6 +55,7 @@ agents:
     args: ["agent", "--local", "--json", "--session-id", "{meetingId}", "-m", "{prompt}"]
     timeoutMs: 1800000
 
+
   - id: hermes
     name: "Hermes"
     type: subprocess
@@ -64,6 +65,15 @@ agents:
     args: ["run_agent.py", "-q", "{prompt}", "--max_turns", "15", "-e", "development"]
     cwd: /Users/matthew/hermes-agent
     timeoutMs: 1800000
+  - id: codex
+    name: "Codex"
+    type: subprocess
+    tool: generic
+    capabilities: [coding, building, debugging, testing, architecture]
+    command: codex
+    args: ["exec", "{prompt}", "--full-auto"]
+    timeoutMs: 1800000
+
 
   # ── Thinkers (LLM API — reasoning, planning, creative) ──
 
@@ -179,6 +189,6 @@ meetings:
     thinkers:
       agents: [deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi, deepseek-web]
     builders:
-      agents: [claude-code, hermes]
+      agents: [claude-code, hermes, codex]
     all:
-      agents: [chatgpt, claude-web, gemini-web, deepseek-web, claude-code, hermes, deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi]
+      agents: [chatgpt, claude-web, gemini-web, deepseek-web, claude-code, hermes, codex, deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi]
