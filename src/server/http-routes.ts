@@ -328,10 +328,27 @@ export function createRouter(
 
         const stored = await store.getMeeting(id);
         if (!stored) return json(res, 404, { error: 'Meeting not found' });
-        if (stored.status !== 'active') {
+        if (stored.status !== 'active' && stored.status !== 'concluded') {
           return json(res, 400, {
-            error: `Meeting status is "${stored.status}", not "active". Only active (interrupted) meetings can be resumed.`,
+            error: `Meeting status is "${stored.status}". Only active or concluded meetings can be resumed.`,
           });
+        }
+
+        const isContinuation = stored.status === 'concluded';
+
+        // For concluded meetings, jump to an open discussion phase so agents
+        // can dive deeper with full prior transcript as context.
+        if (isContinuation) {
+          const contPhase = stored.mode === 'collaboration' ? 'plan' : 'deliberation';
+          stored.currentPhase = contPhase;
+          // Clear the resume point so we start fresh from this phase
+          stored.resumePoint = undefined;
+          // Keep the transcript, phaseTimeline through the vote/summary,
+          // but mark the final timeline entries as exited so the engine
+          // enters the continuation phase cleanly.
+          if (stored.phaseTimeline.length > 0) {
+            stored.phaseTimeline[stored.phaseTimeline.length - 1].exitedAt = Date.now();
+          }
         }
 
         const participants = stored.participantIds
@@ -363,8 +380,9 @@ export function createRouter(
           id: engine.id,
           topic: engine.topic,
           status: 'active',
-          resumedFrom: stored.currentPhase,
+          resumedFrom: isContinuation ? stored.currentPhase : stored.currentPhase,
           transcriptLength: stored.transcript.length,
+          continuation: isContinuation,
         });
       }
 

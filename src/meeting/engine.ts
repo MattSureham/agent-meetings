@@ -33,6 +33,7 @@ export interface MeetingConfig {
   // Resume fields
   resumeId?: string;
   resumeFrom?: ResumePoint;
+  resumePhase?: MeetingPhase;
   initialTranscript?: Message[];
   initialPhaseTimeline?: PhaseTransition[];
   initialTurnManager?: TurnManagerState;
@@ -121,6 +122,9 @@ export class MeetingEngine {
         this.currentPhase = last.phase;
       }
     }
+    if (config.resumePhase) {
+      this.currentPhase = config.resumePhase;
+    }
     if (config.initialTurnManager) {
       this.turnManager = TurnManager.fromJSON(config.initialTurnManager);
     } else {
@@ -161,6 +165,7 @@ export class MeetingEngine {
       onTurnEnd: options.onTurnEnd,
       resumeId: stored.id,
       resumeFrom: stored.resumePoint,
+      resumePhase: stored.currentPhase as MeetingPhase | undefined,
       initialTranscript: stored.transcript,
       initialPhaseTimeline: stored.phaseTimeline,
       initialTurnManager: stored.turnManagerState,
@@ -169,7 +174,7 @@ export class MeetingEngine {
     });
 
     // Restore fields that aren't part of MeetingConfig
-    engine.status = stored.status === 'active' ? 'active' : 'pending';
+    engine.status = (stored.status === 'active' || stored.status === 'concluded') ? 'active' : 'pending';
     engine.createdAt = stored.createdAt;
     engine.totalTurns = stored.totalTurns ?? stored.transcript.length;
     engine.reasonEnded = (stored.reasonEnded as 'completed' | 'cancelled') ?? 'completed';

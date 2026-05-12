@@ -52,6 +52,12 @@
   .past-meeting-item:hover { background: #1f2330; border-color: #2d3039; }
   .past-meeting-item .pm-topic { font-size: 13px; color: #e4e4e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .past-meeting-item .pm-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .past-meeting-item.interrupted { border-color: #854d0e; background: #1f1a10; }
+  .past-meeting-item.interrupted:hover { border-color: #a16207; background: #2a2016; }
+  .pm-actions { display: flex; gap: 6px; margin-top: 4px; }
+  .btn-resume { padding: 4px 10px; border: 1px solid #854d0e; border-radius: 4px; background: #1f1a10; color: #fbbf24; font-size: 11px; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+  .btn-resume:hover { border-color: #fbbf24; background: #2a2016; }
+  .btn-resume:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
   .btn-primary { background: #4f8fff; color: #fff; flex: 1; }
@@ -224,6 +230,11 @@
       </button>
     </div>
 
+    <div id="interrupted-meetings-section" style="display:none">
+      <label style="margin-top:16px;color:#fbbf24">Interrupted Meetings</label>
+      <div id="interrupted-meetings-list" style="margin-top:4px"></div>
+    </div>
+
     <div class="past-meetings" id="past-meetings-section">
       <label style="margin-top:16px">Past Meetings</label>
       <div id="past-meetings-list" style="margin-top:4px">
@@ -274,6 +285,7 @@ async function init() {
   } catch(e) { showBanner('error', 'Failed to load agents. Is the server running?'); }
 
   loadPastMeetings();
+  loadInterruptedMeetings();
 
   $('#btn-start').addEventListener('click', startMeeting);
   $('#btn-stop').addEventListener('click', showStopConfirm);
@@ -789,11 +801,15 @@ async function loadPastMeetings() {
     } else {
       container.innerHTML = meetings.map(function(m) {
         var date = new Date(m.createdAt).toLocaleDateString();
-        var topic = m.topic.length > 50 ? m.topic.slice(0,50) + '...' : m.topic;
+        var topic = escapeHtml(m.topic.length > 50 ? m.topic.slice(0,50) + '...' : m.topic);
         var count = (m.participantIds || []).length;
+        var msgs = (m.transcript || []).length;
         return '<div class="past-meeting-item" onclick="viewPastMeeting(\'' + m.id + '\')">'
-          + '<div class="pm-topic">' + escapeHtml(topic) + '</div>'
-          + '<div class="pm-meta">' + date + ' &middot; ' + count + ' participants &middot; ' + m.mode + '</div>'
+          + '<div class="pm-topic">' + topic + '</div>'
+          + '<div class="pm-meta">' + date + ' &middot; ' + count + ' participants &middot; ' + m.mode + ' &middot; ' + msgs + ' msgs</div>'
+          + '<div class="pm-actions">'
+          + '<button class="btn-resume" style="border-color:#2d3039;background:#1c1e26;color:#a1a5b0" onclick="event.stopPropagation();resumeMeeting(\'' + m.id + '\')">Continue</button>'
+          + '</div>'
           + '</div>';
       }).join('');
     }
@@ -804,13 +820,87 @@ async function loadPastMeetings() {
         + meetings.slice(0, 5).map(function(m) {
           var date = new Date(m.createdAt).toLocaleDateString();
           var topic = m.topic.length > 60 ? m.topic.slice(0,60) + '...' : m.topic;
+          var msgs = (m.transcript || []).length;
           return '<div class="past-meeting-item" onclick="viewPastMeeting(\'' + m.id + '\')" style="text-align:left">'
             + '<div class="pm-topic">' + escapeHtml(topic) + '</div>'
-            + '<div class="pm-meta">' + date + ' &middot; ' + (m.participantIds || []).length + ' participants</div>'
+            + '<div class="pm-meta">' + date + ' &middot; ' + (m.participantIds || []).length + ' participants &middot; ' + msgs + ' msgs</div>'
+            + '<div class="pm-actions"><button class="btn-resume" style="border-color:#2d3039;background:#1c1e26;color:#a1a5b0" onclick="event.stopPropagation();resumeMeeting(\'' + m.id + '\')">Continue</button></div>'
             + '</div>';
         }).join('');
     }
   } catch(e) { /* ignore */ }
+}
+
+async function loadInterruptedMeetings() {
+  try {
+    var res = await fetch('/meetings?status=active&limit=10');
+    if (!res.ok) return;
+    var meetings = await res.json();
+    var section = $('#interrupted-meetings-section');
+    var container = $('#interrupted-meetings-list');
+    if (!meetings.length) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    container.innerHTML = meetings.map(function(m) {
+      var date = new Date(m.createdAt).toLocaleDateString();
+      var topic = escapeHtml(m.topic.length > 50 ? m.topic.slice(0,50) + '...' : m.topic);
+      var count = (m.participantIds || []).length;
+      var phase = m.currentPhase || 'unknown';
+      var msgs = (m.transcript || []).length;
+      return '<div class="past-meeting-item interrupted">'
+        + '<div class="pm-topic" style="color:#fbbf24">' + topic + '</div>'
+        + '<div class="pm-meta">' + date + ' &middot; ' + count + ' agents &middot; ' + msgs + ' msgs &middot; was in ' + phase + '</div>'
+        + '<div class="pm-actions">'
+        + '<button class="btn-resume" onclick="event.stopPropagation();resumeMeeting(\'' + m.id + '\')">Resume</button>'
+        + '<span style="font-size:10px;color:#6b7280;margin-left:6px;display:flex;align-items:center">' + m.id.slice(0,8) + '</span>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  } catch(e) { /* ignore */ }
+}
+
+async function resumeMeeting(id) {
+  if (meetingActive) return;
+
+  var btn = event && event.target;
+  if (btn && btn.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Resuming...'; }
+
+  try {
+    var res = await fetch('/meetings/' + id + '/resume', { method: 'POST' });
+    if (!res.ok) {
+      var err = await res.json();
+      showBanner('error', 'Failed to resume: ' + escapeHtml(err.error || 'Unknown error'));
+      if (btn) { btn.disabled = false; btn.textContent = 'Resume'; }
+      return;
+    }
+    var data = await res.json();
+    meetingId = data.id;
+    meetingActive = true;
+    sessionStorage.setItem('meetingId', meetingId);
+    sessionStorage.setItem('meetingTopic', data.topic);
+    updateUIForActive();
+    $('#download-log').style.display = 'inline';
+    $('#save-snapshot').style.display = 'inline';
+    $('#meeting-title').textContent = data.topic;
+    updateStatus('active');
+    seenMessageCount = 0;
+    lastPhase = null;
+    $('#transcript-container').innerHTML = '';
+    if (data.continuation) {
+      showBanner('success', 'Continuing discussion from "' + (data.resumedFrom || 'unknown') + '" phase with ' + (data.transcriptLength || 0) + ' prior messages.');
+    } else {
+      showBanner('success', 'Resumed from phase "' + (data.resumedFrom || 'unknown') + '" with ' + (data.transcriptLength || 0) + ' existing messages.');
+    }
+    startPolling();
+    loadInterruptedMeetings();
+    loadPastMeetings();
+  } catch(e) {
+    showBanner('error', 'Failed to resume: ' + escapeHtml(e.message));
+    if (btn) { btn.disabled = false; btn.textContent = 'Resume'; }
+  }
 }
 
 function viewPastMeeting(id) {

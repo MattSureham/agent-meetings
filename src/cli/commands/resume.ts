@@ -65,11 +65,25 @@ export function resumeCommand(): Command {
         process.exit(1);
       }
 
-      if (stored.status !== 'active') {
+      if (stored.status !== 'active' && stored.status !== 'concluded') {
         console.error(
-          `Meeting status is "${stored.status}", not "active". Only active (interrupted) meetings can be resumed.`
+          `Meeting status is "${stored.status}". Only active or concluded meetings can be resumed.`
         );
         process.exit(1);
+      }
+
+      const isContinuation = stored.status === 'concluded';
+
+      // For concluded meetings, jump to an open discussion phase so agents
+      // can dive deeper with full prior transcript as context.
+      if (isContinuation) {
+        const contPhase = stored.mode === 'collaboration' ? 'plan' : 'deliberation';
+        console.error(`Continuing concluded meeting — jumping to ${contPhase} phase with full transcript.`);
+        stored.currentPhase = contPhase;
+        stored.resumePoint = undefined;
+        if (stored.phaseTimeline.length > 0) {
+          stored.phaseTimeline[stored.phaseTimeline.length - 1].exitedAt = Date.now();
+        }
       }
 
       const registry = new AgentRegistry(store);
