@@ -46,6 +46,25 @@ export interface MeetingSummary {
   decisions?: string[];
 }
 
+export interface TurnManagerState {
+  order: { id: string; name: string; hasSpoken: boolean }[];
+  currentIdx: number;
+  handRaised: string[];
+  speakerHistory: string[];
+}
+
+export interface ResumePoint {
+  rebuttalRound: number;
+}
+
+export interface StoredMeetingConfig {
+  turnTimeoutMs: number;
+  maxRebuttalRounds: number;
+  maxDeliberationRounds: number;
+  mode: string;
+  workDir?: string;
+}
+
 export interface StoredMeeting {
   id: string;
   topic: string;
@@ -61,4 +80,12 @@ export interface StoredMeeting {
   currentPhase: string | null;
   createdAt: number;
   concludedAt: number | null;
+  // Checkpoint/resume fields (all optional for backward compat)
+  config?: StoredMeetingConfig;
+  turnManagerState?: TurnManagerState;
+  resumePoint?: ResumePoint;
+  contextImages?: { data: string; mimeType: string }[];
+  reasonEnded?: string;
+  totalTurns?: number;
+  lastCheckpointAt?: number;
 }

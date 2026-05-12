@@ -1,4 +1,5 @@
 import type { IAgent } from '../agent/types.js';
+import type { TurnManagerState } from './types.js';
 
 export interface TurnOrder {
   id: string;
@@ -56,5 +57,23 @@ export class TurnManager {
 
   handsRemaining(): number {
     return this.handRaised.length;
+  }
+
+  toJSON(): TurnManagerState {
+    return {
+      order: this.order.map((o) => ({ ...o })),
+      currentIdx: this.currentIdx,
+      handRaised: [...this.handRaised],
+      speakerHistory: [...this.speakerHistory],
+    };
+  }
+
+  static fromJSON(state: TurnManagerState): TurnManager {
+    const tm = new TurnManager();
+    tm.order = state.order.map((o) => ({ ...o }));
+    tm.currentIdx = state.currentIdx;
+    tm.handRaised = [...state.handRaised];
+    tm.speakerHistory = [...state.speakerHistory];
+    return tm;
   }
 }

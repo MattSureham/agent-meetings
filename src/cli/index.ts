@@ -7,6 +7,7 @@ import { listCommand } from './commands/list.js';
 import { viewCommand } from './commands/view.js';
 import { configCommand } from './commands/config.js';
 import { runCommand } from './commands/run.js';
+import { resumeCommand } from './commands/resume.js';
 import { browserSetupCommand } from './commands/browser-setup.js';
 
 const program = new Command();
@@ -18,6 +19,7 @@ program
   .version('0.1.0');
 
 program.addCommand(runCommand());
+program.addCommand(resumeCommand());
 program.addCommand(browserSetupCommand());
 program.addCommand(serveCommand());
 program.addCommand(scheduleCommand());

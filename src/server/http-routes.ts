@@ -51,6 +51,17 @@ export function createRouter(
 ) {
   const meetings: Map<string, RunningMeeting> = new Map();
 
+  // Detect interrupted meetings from a previous server run
+  store.listMeetings({ status: 'active' }).then((active) => {
+    if (active.length > 0) {
+      console.log(`Found ${active.length} interrupted meeting(s) from previous run:`);
+      for (const m of active) {
+        console.log(`  ${m.id} — "${m.topic}" [was in phase: ${m.currentPhase}]`);
+      }
+      console.log('Use POST /meetings/:id/resume to resume an interrupted meeting.');
+    }
+  }).catch(() => {});
+
   return async function router(
     req: IncomingMessage,
     res: ServerResponse
@@ -201,6 +212,7 @@ export function createRouter(
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationRounds: config.meetings.maxDeliberationRounds,
           defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
+          checkpointStore: store,
         });
 
         await store.saveMeeting(engine.toStoredMeeting());
@@ -285,12 +297,15 @@ export function createRouter(
         const engine = new MeetingEngine({
           topic: stored.topic,
           context: stored.context,
+          contextImages: stored.contextImages,
           participants,
           moderatorId: stored.moderatorId,
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationRounds: config.meetings.maxDeliberationRounds,
           defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
+          resumeId: stored.id,
+          checkpointStore: store,
         });
 
         const running: RunningMeeting = { engine, running: null };
@@ -302,6 +317,55 @@ export function createRouter(
         });
 
         return json(res, 200, { id: engine.id, status: 'active' });
+      }
+
+      if (method === 'POST' && path.startsWith('/meetings/') && path.endsWith('/resume')) {
+        const id = path.slice('/meetings/'.length).replace('/resume', '');
+
+        if (meetings.has(id)) {
+          return json(res, 409, { error: 'Meeting is already running' });
+        }
+
+        const stored = await store.getMeeting(id);
+        if (!stored) return json(res, 404, { error: 'Meeting not found' });
+        if (stored.status !== 'active') {
+          return json(res, 400, {
+            error: `Meeting status is "${stored.status}", not "active". Only active (interrupted) meetings can be resumed.`,
+          });
+        }
+
+        const participants = stored.participantIds
+          .map((pid) => registry.get(pid))
+          .filter((a): a is IAgent => a != null);
+
+        const missingAgents = stored.participantIds.filter((pid) => !registry.get(pid));
+        if (missingAgents.length > 0) {
+          return json(res, 400, {
+            error: `Agents not available: ${missingAgents.join(', ')}`,
+            missingAgents,
+          });
+        }
+
+        const engine = MeetingEngine.fromStoredMeeting(stored, participants, {
+          defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
+          checkpointStore: store,
+        });
+
+        const running: RunningMeeting = { engine, running: null };
+        meetings.set(engine.id, running);
+
+        running.running = engine.start().then(() => {
+          store.saveMeeting(engine.toStoredMeeting()).catch(() => {});
+          saveMeetingLog(config.server.dataDir, engine);
+        });
+
+        return json(res, 200, {
+          id: engine.id,
+          topic: engine.topic,
+          status: 'active',
+          resumedFrom: stored.currentPhase,
+          transcriptLength: stored.transcript.length,
+        });
       }
 
       if (method === 'POST' && path.startsWith('/meetings/') && path.endsWith('/cancel')) {

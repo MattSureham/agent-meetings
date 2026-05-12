@@ -652,6 +652,13 @@ agent-meetings run -t <topic> -a <agent-ids> [options]
   --max-turns <n>              Max total turns before forcing conclusion (default: 50)
   --no-stream                  Only show summary, not live transcript
 
+agent-meetings resume <meeting-id> [options]
+  Resume an interrupted meeting from where it left off. Restores full transcript,
+  phase position, turn state, and working directory from the last checkpoint.
+  -c, --config <path>          Path to config file (default: ./meetings.config.yml)
+  -s, --server <url>           Delegate to a running server
+  --no-stream                  Only show summary, not live transcript
+
 agent-meetings serve [options]
   Start the persistent server (for multiple meetings, WS agents).
   -p, --port <port>            Port to listen on
@@ -828,7 +835,7 @@ All data lives in the `dataDir` directory (default `./data`):
 data/
 ├── agents.json                # Array of registered agents
 └── meetings/
-    ├── <uuid-1>.json          # Full meeting record (JSON — topic, transcript, summary, phase timeline)
+    ├── <uuid-1>.json          # Full meeting record (JSON — topic, transcript, summary, phase timeline, checkpoint state)
     ├── <uuid-1>.log           # Human-readable transcript log (same meeting, readable format)
     ├── <uuid-2>.json
     ├── <uuid-2>.log
@@ -836,6 +843,22 @@ data/
 ```
 
 Each `run` command saves two files: a `.json` record for programmatic access and a `.log` file for human reading. Both are written automatically at meeting end. The file paths are printed to the terminal.
+
+### Checkpointing and Resume
+
+The meeting engine writes a checkpoint to `{id}.json` after every agent turn and phase transition. If a meeting is interrupted (crash, Ctrl+C, server restart), it can be resumed from where it left off:
+
+```bash
+# Start a meeting, then Ctrl+C mid-way
+agent-meetings run -t "Architecture review" -a deepseek,minimax
+
+# Resume it — same ID, same transcript, same phase, same workDir
+agent-meetings resume <meeting-id>
+```
+
+Interrupted meetings appear with status `active` on disk. On server startup, the framework detects them and logs instructions for resuming. Use `POST /meetings/:id/resume` to resume via the HTTP API.
+
+The checkpoint preserves: full transcript, phase timeline, turn manager state (who has spoken, raised hands), rebuttal round position, config values, context images, and working directory.
 
 ---
 

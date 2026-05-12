@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IAgent, TranscriptMessage } from '../agent/types.js';
 import type { LLMAdapter } from '../llm/types.js';
+import type { DataStore } from '../persistence/types.js';
 import {
   MeetingPhase,
   type MeetingStatus,
@@ -8,6 +9,8 @@ import {
   type PhaseTransition,
   type MeetingSummary,
   type StoredMeeting,
+  type TurnManagerState,
+  type ResumePoint,
 } from './types.js';
 import { TurnManager } from './turn-manager.js';
 import { Moderator } from './moderator.js';
@@ -27,7 +30,30 @@ export interface MeetingConfig {
   defaultLLM?: LLMAdapter;
   onTurnStart?: (agentName: string) => void;
   onTurnEnd?: (agentName: string) => void;
+  // Resume fields
+  resumeId?: string;
+  resumeFrom?: ResumePoint;
+  initialTranscript?: Message[];
+  initialPhaseTimeline?: PhaseTransition[];
+  initialTurnManager?: TurnManagerState;
+  initialContextImages?: { data: string; mimeType: string }[];
+  checkpointStore?: DataStore;
 }
+
+const PHASE_ORDER_DEBATE: MeetingPhase[] = [
+  MeetingPhase.OPENING,
+  MeetingPhase.POSITION,
+  MeetingPhase.REBUTTAL,
+  MeetingPhase.DELIBERATION,
+  MeetingPhase.VOTING,
+];
+
+const PHASE_ORDER_COLLAB: MeetingPhase[] = [
+  MeetingPhase.OPENING,
+  MeetingPhase.PLAN,
+  MeetingPhase.BUILD,
+  MeetingPhase.REVIEW,
+];
 
 export class MeetingEngine {
   readonly id: string;
@@ -58,11 +84,15 @@ export class MeetingEngine {
   reasonEnded: 'completed' | 'cancelled' = 'completed';
   currentTurn: string | null = null;
 
+  private resumePoint: ResumePoint = { rebuttalRound: 0 };
+  private checkpointStore: DataStore | null = null;
+  private isResuming = false;
+
   constructor(config: MeetingConfig) {
-    this.id = randomUUID();
+    this.id = config.resumeId ?? randomUUID();
     this.topic = config.topic;
     this.context = config.context;
-    this.contextImages = config.contextImages ?? [];
+    this.contextImages = config.initialContextImages ?? config.contextImages ?? [];
     this.moderatorId = config.moderatorId ?? '__system_moderator__';
     this.mode = config.mode ?? 'debate';
     this.turnTimeoutMs = config.turnTimeoutMs ?? 60_000;
@@ -72,11 +102,90 @@ export class MeetingEngine {
     this.participantIds = config.participants.map((a) => a.id);
 
     this.agents = new Map(config.participants.map((a) => [a.id, a]));
-    this.turnManager = new TurnManager();
     this.moderator = new Moderator(config.defaultLLM ?? null, this.mode, config.workDir ?? null);
     this.summarizer = new Summarizer(config.defaultLLM ?? null);
     this.onTurnStart = config.onTurnStart;
     this.onTurnEnd = config.onTurnEnd;
+
+    // Resume state
+    if (config.resumeFrom) {
+      this.resumePoint = { ...config.resumeFrom };
+    }
+    if (config.initialTranscript) {
+      this.transcript = config.initialTranscript;
+    }
+    if (config.initialPhaseTimeline) {
+      this.phaseTimeline = config.initialPhaseTimeline;
+      const last = config.initialPhaseTimeline[config.initialPhaseTimeline.length - 1];
+      if (last) {
+        this.currentPhase = last.phase;
+      }
+    }
+    if (config.initialTurnManager) {
+      this.turnManager = TurnManager.fromJSON(config.initialTurnManager);
+    } else {
+      this.turnManager = new TurnManager();
+    }
+    this.checkpointStore = config.checkpointStore ?? null;
+    this.isResuming = !!(
+      config.resumeId ||
+      config.initialTranscript ||
+      config.initialPhaseTimeline
+    );
+  }
+
+  static fromStoredMeeting(
+    stored: StoredMeeting,
+    participants: IAgent[],
+    options: {
+      defaultLLM?: LLMAdapter;
+      onTurnStart?: (name: string) => void;
+      onTurnEnd?: (name: string) => void;
+      checkpointStore?: DataStore;
+    } = {}
+  ): MeetingEngine {
+    const storedConfig = stored.config;
+    const engine = new MeetingEngine({
+      topic: stored.topic,
+      context: stored.context,
+      contextImages: stored.contextImages,
+      participants,
+      moderatorId: stored.moderatorId,
+      mode: (storedConfig?.mode ?? stored.mode) as 'debate' | 'collaboration',
+      workDir: storedConfig?.workDir ?? undefined,
+      turnTimeoutMs: storedConfig?.turnTimeoutMs,
+      maxRebuttalRounds: storedConfig?.maxRebuttalRounds,
+      maxDeliberationRounds: storedConfig?.maxDeliberationRounds,
+      defaultLLM: options.defaultLLM,
+      onTurnStart: options.onTurnStart,
+      onTurnEnd: options.onTurnEnd,
+      resumeId: stored.id,
+      resumeFrom: stored.resumePoint,
+      initialTranscript: stored.transcript,
+      initialPhaseTimeline: stored.phaseTimeline,
+      initialTurnManager: stored.turnManagerState,
+      initialContextImages: stored.contextImages,
+      checkpointStore: options.checkpointStore,
+    });
+
+    // Restore fields that aren't part of MeetingConfig
+    engine.status = stored.status === 'active' ? 'active' : 'pending';
+    engine.createdAt = stored.createdAt;
+    engine.totalTurns = stored.totalTurns ?? stored.transcript.length;
+    engine.reasonEnded = (stored.reasonEnded as 'completed' | 'cancelled') ?? 'completed';
+    engine.concludedAt = stored.concludedAt;
+    engine.summary = stored.summary;
+
+    return engine;
+  }
+
+  async checkpoint(): Promise<void> {
+    if (!this.checkpointStore) return;
+    try {
+      await this.checkpointStore.saveMeeting(this.toStoredMeeting());
+    } catch {
+      // best-effort — don't crash the meeting over a save failure
+    }
   }
 
   async start(): Promise<void> {
@@ -98,16 +207,38 @@ export class MeetingEngine {
     this.concludedAt = Date.now();
   }
 
+  private phaseIdx(phase: MeetingPhase): number {
+    const order = this.mode === 'collaboration' ? PHASE_ORDER_COLLAB : PHASE_ORDER_DEBATE;
+    return order.indexOf(phase);
+  }
+
+  private shouldEnterPhase(phase: MeetingPhase): boolean {
+    if (!this.isResuming) return true;
+    return this.phaseIdx(this.currentPhase) <= this.phaseIdx(phase);
+  }
+
   private async runDebate(): Promise<void> {
-    await this.advancePhase(MeetingPhase.OPENING);
-    await this.runOpening();
-    if (this.aborted) return;
+    // OPENING
+    if (this.shouldEnterPhase(MeetingPhase.OPENING)) {
+      await this.advancePhase(MeetingPhase.OPENING);
+      await this.runOpening();
+      if (this.aborted) return;
+    }
 
-    await this.advancePhase(MeetingPhase.POSITION);
-    await this.runRoundRobin(MeetingPhase.POSITION);
-    if (this.aborted) return;
+    // POSITION
+    if (this.shouldEnterPhase(MeetingPhase.POSITION)) {
+      await this.advancePhase(MeetingPhase.POSITION);
+      await this.runRoundRobin(MeetingPhase.POSITION);
+      if (this.aborted) return;
+    }
 
-    for (let r = 0; r < this.maxRebuttalRounds; r++) {
+    // REBUTTAL
+    const startRebuttal =
+      this.isResuming && this.currentPhase === MeetingPhase.REBUTTAL
+        ? this.resumePoint.rebuttalRound
+        : 0;
+    for (let r = startRebuttal; r < this.maxRebuttalRounds; r++) {
+      this.resumePoint.rebuttalRound = r;
       await this.advancePhase(MeetingPhase.REBUTTAL);
       await this.runRoundRobin(MeetingPhase.REBUTTAL);
       if (this.aborted) break;
@@ -115,29 +246,47 @@ export class MeetingEngine {
     }
     if (this.aborted) return;
 
-    await this.advancePhase(MeetingPhase.DELIBERATION);
-    await this.runDeliberation();
-    if (this.aborted) return;
+    // DELIBERATION
+    if (this.shouldEnterPhase(MeetingPhase.DELIBERATION)) {
+      await this.advancePhase(MeetingPhase.DELIBERATION);
+      await this.runDeliberation();
+      if (this.aborted) return;
+    }
 
-    await this.advancePhase(MeetingPhase.VOTING);
-    await this.runVoting();
+    // VOTING
+    if (this.shouldEnterPhase(MeetingPhase.VOTING)) {
+      await this.advancePhase(MeetingPhase.VOTING);
+      await this.runVoting();
+    }
   }
 
   private async runCollaboration(): Promise<void> {
-    await this.advancePhase(MeetingPhase.OPENING);
-    await this.runOpening();
-    if (this.aborted) return;
+    // OPENING
+    if (this.shouldEnterPhase(MeetingPhase.OPENING)) {
+      await this.advancePhase(MeetingPhase.OPENING);
+      await this.runOpening();
+      if (this.aborted) return;
+    }
 
-    await this.advancePhase(MeetingPhase.PLAN);
-    await this.runRoundRobin(MeetingPhase.PLAN);
-    if (this.aborted) return;
+    // PLAN
+    if (this.shouldEnterPhase(MeetingPhase.PLAN)) {
+      await this.advancePhase(MeetingPhase.PLAN);
+      await this.runRoundRobin(MeetingPhase.PLAN);
+      if (this.aborted) return;
+    }
 
-    await this.advancePhase(MeetingPhase.BUILD);
-    await this.runRoundRobin(MeetingPhase.BUILD);
-    if (this.aborted) return;
+    // BUILD
+    if (this.shouldEnterPhase(MeetingPhase.BUILD)) {
+      await this.advancePhase(MeetingPhase.BUILD);
+      await this.runRoundRobin(MeetingPhase.BUILD);
+      if (this.aborted) return;
+    }
 
-    await this.advancePhase(MeetingPhase.REVIEW);
-    await this.runRoundRobin(MeetingPhase.REVIEW);
+    // REVIEW
+    if (this.shouldEnterPhase(MeetingPhase.REVIEW)) {
+      await this.advancePhase(MeetingPhase.REVIEW);
+      await this.runRoundRobin(MeetingPhase.REVIEW);
+    }
   }
 
   cancel(): void {
@@ -154,10 +303,9 @@ export class MeetingEngine {
   }
 
   toStoredMeeting(): StoredMeeting {
-    let storedContext = this.context;
-    if (this.contextImages.length > 0) {
-      storedContext += `\n\n[${this.contextImages.length} image(s) included in context]`;
-    }
+    const storedContext = this.contextImages.length > 0
+      ? `${this.context}\n\n[${this.contextImages.length} image(s) included in context]`
+      : this.context;
     return {
       id: this.id,
       topic: this.topic,
@@ -173,6 +321,19 @@ export class MeetingEngine {
       currentPhase: this.currentPhase,
       createdAt: this.createdAt,
       concludedAt: this.concludedAt,
+      config: {
+        turnTimeoutMs: this.turnTimeoutMs,
+        maxRebuttalRounds: this.maxRebuttalRounds,
+        maxDeliberationRounds: this.maxDeliberationRounds,
+        mode: this.mode,
+        workDir: this.moderator.activeWorkDir ?? undefined,
+      },
+      turnManagerState: this.turnManager.toJSON(),
+      resumePoint: { ...this.resumePoint },
+      contextImages: this.contextImages.length > 0 ? this.contextImages : undefined,
+      reasonEnded: this.reasonEnded,
+      totalTurns: this.totalTurns,
+      lastCheckpointAt: Date.now(),
     };
   }
 
@@ -189,6 +350,7 @@ export class MeetingEngine {
       enteredAt: Date.now(),
       exitedAt: null,
     });
+    await this.checkpoint();
   }
 
   private async runOpening(): Promise<void> {
@@ -207,7 +369,6 @@ export class MeetingEngine {
   private async runRoundRobin(phase: MeetingPhase): Promise<void> {
     let participants = [...this.agents.values()];
 
-    // BUILD phase: only subprocess agents can actually execute tools
     if (phase === MeetingPhase.BUILD) {
       participants = participants.filter((a) => a.type === 'subprocess');
       if (participants.length === 0) {
@@ -245,7 +406,6 @@ export class MeetingEngine {
 
       await this.promptAgent(agent, currentPrompt);
 
-      // check for raised hand during position/rebuttal
       const lastMessage = this.transcript
         .slice()
         .reverse()
@@ -259,7 +419,6 @@ export class MeetingEngine {
   private async runDeliberation(): Promise<void> {
     let rounds = 0;
 
-    // Round 1: prompt everyone to raise topics
     const participants = [...this.agents.values()];
     for (const agent of participants) {
       if (this.aborted) return;
@@ -271,11 +430,9 @@ export class MeetingEngine {
 
     let stalemateCount = 0;
 
-    // Rounds 2+: each round, everyone with raised hands gets to speak
     while (this.turnManager.handsRemaining() > 0 && rounds < this.maxDeliberationRounds) {
       if (this.aborted) return;
 
-      // Collect all currently raised hands
       const roundSpeakers: string[] = [];
       while (this.turnManager.handsRemaining() > 0) {
         const id = this.turnManager.getNextHand();
@@ -292,7 +449,6 @@ export class MeetingEngine {
 
       rounds++;
 
-      // Stalemate: if no new hands raised this round, assume discussion exhausted
       if (this.turnManager.handsRemaining() === 0) {
         stalemateCount++;
         if (stalemateCount >= 2) {
@@ -423,15 +579,17 @@ export class MeetingEngine {
         phase: this.currentPhase,
         topic: this.topic,
         background: this.context,
-        contextImages: agent.supportsVision && this.contextImages.length > 0
-          ? this.contextImages
-          : undefined,
+        contextImages:
+          agent.supportsVision && this.contextImages.length > 0
+            ? this.contextImages
+            : undefined,
         transcript: transcriptMessages,
         speakingOrder: this.participantIds,
         currentPrompt: promptText,
       });
 
       this.addMessage(agent.id, agent.name, response.content, Date.now() - started);
+      await this.checkpoint();
     } catch (e) {
       console.error(`[engine] ${agent.name} failed:`, e instanceof Error ? e.message : e);
       this.addMessage(
@@ -445,7 +603,12 @@ export class MeetingEngine {
     }
   }
 
-  private addMessage(authorId: string, authorName: string, content: string, durationMs?: number): void {
+  private addMessage(
+    authorId: string,
+    authorName: string,
+    content: string,
+    durationMs?: number
+  ): void {
     this.transcript.push({
       id: randomUUID(),
       authorId,
