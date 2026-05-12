@@ -74,6 +74,15 @@ agents:
     args: ["exec", "{prompt}", "--full-auto"]
     timeoutMs: 1800000
 
+  - id: opencode
+    name: "OpenCode"
+    type: subprocess
+    tool: generic
+    capabilities: [coding, building, debugging, testing, architecture]
+    command: opencode
+    args: ["run", "{prompt}", "-m", "deepseek/deepseek-v4-pro", "--dangerously-skip-permissions"]
+    timeoutMs: 1800000
+
 
   # ── Thinkers (LLM API — reasoning, planning, creative) ──
 
@@ -189,6 +198,6 @@ meetings:
     thinkers:
       agents: [deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi, deepseek-web]
     builders:
-      agents: [claude-code, hermes, codex]
+      agents: [claude-code, hermes, codex, opencode]
     all:
-      agents: [chatgpt, claude-web, gemini-web, deepseek-web, claude-code, hermes, codex, deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi]
+      agents: [chatgpt, claude-web, gemini-web, deepseek-web, claude-code, hermes, codex, opencode, deepseek, deepseek-reasoner, minimax-m2.7, qwen, kimi]
