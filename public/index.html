@@ -274,6 +274,7 @@ let meetingId = null;
 let pollTimer = null;
 let agents = [];
 let meetingActive = false;
+let continueFromId = null;
 
 // ── Init ──
 async function init() {
@@ -433,18 +434,29 @@ async function startMeeting() {
   if (!topic || participantIds.length < 2) return;
 
   const btn = $('#btn-start');
+  const isContinue = !!continueFromId;
   btn.classList.add('loading');
-  btn.querySelector('.btn-label').textContent = 'Starting...';
+  btn.querySelector('.btn-label').textContent = isContinue ? 'Starting...' : 'Starting...';
   clearBanner();
 
+  // Build body for either new meeting or continue
+  var body;
+  if (isContinue) {
+    body = JSON.stringify({ workDir: workDir || undefined });
+  } else {
+    body = JSON.stringify({
+      topic, context, participantIds, moderatorId,
+      autoStart: true, mode, workDir,
+    });
+  }
+
+  var url = isContinue ? '/meetings/' + continueFromId + '/resume' : '/meetings';
+
   try {
-    const res = await fetch('/meetings', {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        topic, context, participantIds, moderatorId,
-        autoStart: true, mode, workDir,
-      }),
+      body: body,
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
     const data = await res.json();
@@ -460,11 +472,21 @@ async function startMeeting() {
     seenMessageCount = 0;
     lastPhase = null;
     $('#transcript-container').innerHTML = '';
-    showBanner('success', 'Meeting started — agents are responding...');
+
+    if (data.continuation) {
+      showBanner('success', 'Continuing discussion from "' + (data.resumedFrom || 'unknown') + '" phase with ' + (data.transcriptLength || 0) + ' prior messages.');
+    } else if (isContinue) {
+      showBanner('success', 'Resumed from phase "' + (data.resumedFrom || 'unknown') + '" with ' + (data.transcriptLength || 0) + ' existing messages.');
+    } else {
+      showBanner('success', 'Meeting started — agents are responding...');
+    }
     startPolling();
+    loadInterruptedMeetings();
+    loadPastMeetings();
   } catch(e) {
-    showBanner('error', 'Failed to start: ' + escapeHtml(e.message));
+    showBanner('error', (isContinue ? 'Failed to resume: ' : 'Failed to start: ') + escapeHtml(e.message));
   } finally {
+    continueFromId = null;
     btn.classList.remove('loading');
     btn.querySelector('.btn-label').textContent = 'Start Meeting';
     updateStartButton();
@@ -808,7 +830,7 @@ async function loadPastMeetings() {
           + '<div class="pm-topic">' + topic + '</div>'
           + '<div class="pm-meta">' + date + ' &middot; ' + count + ' participants &middot; ' + m.mode + ' &middot; ' + msgs + ' msgs</div>'
           + '<div class="pm-actions">'
-          + '<button class="btn-resume" style="border-color:#2d3039;background:#1c1e26;color:#a1a5b0" onclick="event.stopPropagation();resumeMeeting(\'' + m.id + '\')">Continue</button>'
+          + '<button class="btn-resume" style="border-color:#2d3039;background:#1c1e26;color:#a1a5b0" onclick="event.stopPropagation();prepareContinue(\'' + m.id + '\')">Continue...</button>'
           + '</div>'
           + '</div>';
       }).join('');
@@ -853,7 +875,7 @@ async function loadInterruptedMeetings() {
         + '<div class="pm-topic" style="color:#fbbf24">' + topic + '</div>'
         + '<div class="pm-meta">' + date + ' &middot; ' + count + ' agents &middot; ' + msgs + ' msgs &middot; was in ' + phase + '</div>'
         + '<div class="pm-actions">'
-        + '<button class="btn-resume" onclick="event.stopPropagation();resumeMeeting(\'' + m.id + '\')">Resume</button>'
+                + '<button class="btn-resume" onclick="event.stopPropagation();prepareContinue(\'' + m.id + '\')">Resume...</button>'
         + '<span style="font-size:10px;color:#6b7280;margin-left:6px;display:flex;align-items:center">' + m.id.slice(0,8) + '</span>'
         + '</div>'
         + '</div>';
@@ -861,45 +883,62 @@ async function loadInterruptedMeetings() {
   } catch(e) { /* ignore */ }
 }
 
-async function resumeMeeting(id) {
+async function prepareContinue(id) {
   if (meetingActive) return;
 
-  var btn = event && event.target;
-  if (btn && btn.disabled) return;
-  if (btn) { btn.disabled = true; btn.textContent = 'Resuming...'; }
-
   try {
-    var res = await fetch('/meetings/' + id + '/resume', { method: 'POST' });
-    if (!res.ok) {
-      var err = await res.json();
-      showBanner('error', 'Failed to resume: ' + escapeHtml(err.error || 'Unknown error'));
-      if (btn) { btn.disabled = false; btn.textContent = 'Resume'; }
-      return;
+    var res = await fetch('/meetings/' + id);
+    if (!res.ok) { showBanner('error', 'Failed to load meeting details.'); return; }
+    var meeting = await res.json();
+
+    // Populate the form
+    $('#topic').value = meeting.topic;
+    $('#context').value = meeting.context || '';
+
+    // Set mode toggle
+    $$('#mode-toggle button').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.mode === meeting.mode);
+    });
+
+    // Set workDir from stored config, or leave blank
+    var storedWorkDir = (meeting.config && meeting.config.workDir) || '';
+    $('#workdir').value = storedWorkDir;
+
+    // Set moderator
+    if (meeting.moderatorId) $('#moderator').value = meeting.moderatorId;
+
+    // Set settings
+    if (meeting.config) {
+      $('#rebuttal-rounds').value = meeting.config.maxRebuttalRounds || 1;
+      $('#deliberation-turns').value = meeting.config.maxDeliberationRounds || 10;
+      $('#turn-timeout').value = meeting.config.turnTimeoutMs || 60000;
     }
-    var data = await res.json();
-    meetingId = data.id;
-    meetingActive = true;
-    sessionStorage.setItem('meetingId', meetingId);
-    sessionStorage.setItem('meetingTopic', data.topic);
-    updateUIForActive();
-    $('#download-log').style.display = 'inline';
-    $('#save-snapshot').style.display = 'inline';
-    $('#meeting-title').textContent = data.topic;
-    updateStatus('active');
-    seenMessageCount = 0;
-    lastPhase = null;
-    $('#transcript-container').innerHTML = '';
-    if (data.continuation) {
-      showBanner('success', 'Continuing discussion from "' + (data.resumedFrom || 'unknown') + '" phase with ' + (data.transcriptLength || 0) + ' prior messages.');
-    } else {
-      showBanner('success', 'Resumed from phase "' + (data.resumedFrom || 'unknown') + '" with ' + (data.transcriptLength || 0) + ' existing messages.');
-    }
-    startPolling();
-    loadInterruptedMeetings();
-    loadPastMeetings();
+
+    // Select agents
+    var ids = meeting.participantIds || [];
+    $$('.agent-chip').forEach(function(c) {
+      c.classList.toggle('selected', ids.indexOf(c.dataset.id) >= 0);
+    });
+
+    // Set continue mode
+    continueFromId = id;
+    var isActive = meeting.status === 'active';
+    var label = isActive ? 'Resume Meeting' : 'Continue Meeting';
+    $('#btn-start').querySelector('.btn-label').textContent = label;
+    updateStartButton();
+
+    // Clear transcript area
+    $('#transcript-container').innerHTML = '<div class="transcript-empty"><div class="icon">🔄</div><p>Ready to ' + (isActive ? 'resume' : 'continue') + ' <strong>' + escapeHtml(meeting.topic) + '</strong></p><p style="color:#6b7280;font-size:12px;margin-top:4px">' + (meeting.transcript || []).length + ' prior messages &middot; was in phase: ' + (meeting.currentPhase || 'unknown') + '</p><p style="color:#6b7280;font-size:12px">Set a working directory above if agents need to write files.</p></div>';
+    $('#meeting-title').textContent = meeting.topic;
+    updateStatus('idle');
+
+    // Scroll to workDir to draw attention
+    $('#workdir').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#workdir').focus();
+
+    showBanner('info', 'Form populated — set a working directory then click "' + label + '".');
   } catch(e) {
-    showBanner('error', 'Failed to resume: ' + escapeHtml(e.message));
-    if (btn) { btn.disabled = false; btn.textContent = 'Resume'; }
+    showBanner('error', 'Failed to prepare: ' + escapeHtml(e.message));
   }
 }
 

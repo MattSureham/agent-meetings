@@ -146,6 +146,7 @@ export class MeetingEngine {
       onTurnStart?: (name: string) => void;
       onTurnEnd?: (name: string) => void;
       checkpointStore?: DataStore;
+      workDir?: string;
     } = {}
   ): MeetingEngine {
     const storedConfig = stored.config;
@@ -156,7 +157,7 @@ export class MeetingEngine {
       participants,
       moderatorId: stored.moderatorId,
       mode: (storedConfig?.mode ?? stored.mode) as 'debate' | 'collaboration',
-      workDir: storedConfig?.workDir ?? undefined,
+      workDir: options.workDir ?? storedConfig?.workDir ?? undefined,
       turnTimeoutMs: storedConfig?.turnTimeoutMs,
       maxRebuttalRounds: storedConfig?.maxRebuttalRounds,
       maxDeliberationRounds: storedConfig?.maxDeliberationRounds,

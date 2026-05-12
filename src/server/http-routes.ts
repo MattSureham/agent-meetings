@@ -321,6 +321,7 @@ export function createRouter(
 
       if (method === 'POST' && path.startsWith('/meetings/') && path.endsWith('/resume')) {
         const id = path.slice('/meetings/'.length).replace('/resume', '');
+        const body = await readBody<{ workDir?: string }>(req);
 
         if (meetings.has(id)) {
           return json(res, 409, { error: 'Meeting is already running' });
@@ -366,6 +367,7 @@ export function createRouter(
         const engine = MeetingEngine.fromStoredMeeting(stored, participants, {
           defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
           checkpointStore: store,
+          workDir: body.workDir ?? undefined,
         });
 
         const running: RunningMeeting = { engine, running: null };
