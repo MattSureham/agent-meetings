@@ -15,6 +15,7 @@
     "build": "tsc",
     "dev": "tsx src/cli/index.ts",
     "start": "tsx src/cli/index.ts serve",
+    "stop": "lsof -t -i :4200 | xargs kill",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src --ext .ts",
