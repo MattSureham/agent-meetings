@@ -820,7 +820,7 @@ function escapeHtml(s) {
 
 async function loadPastMeetings() {
   try {
-    var res = await fetch('/meetings?status=concluded&limit=10');
+    var res = await fetch('/meetings?status=concluded&limit=50');
     if (!res.ok) return;
     var meetings = await res.json();
     // Sidebar
@@ -862,7 +862,7 @@ async function loadPastMeetings() {
 
 async function loadInterruptedMeetings() {
   try {
-    var res = await fetch('/meetings?status=active&limit=10');
+    var res = await fetch('/meetings?status=active&limit=50');
     if (!res.ok) return;
     var meetings = await res.json();
     var section = $('#interrupted-meetings-section');
