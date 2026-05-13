@@ -555,8 +555,10 @@ npx tsx src/cli/index.ts schedule -t "Architecture review" -a deepseek,minimax
 npx tsx src/cli/index.ts list meetings
 npx tsx src/cli/index.ts view <id>
 
-# Stop the server
+# Stop the server (macOS/Linux)
 npm stop
+
+# On Windows, use Ctrl+C in the server terminal instead
 ```
 
 ### Web Console
