@@ -829,7 +829,7 @@ async function loadPastMeetings() {
       container.innerHTML = '<span style="color:#4a4d56;font-size:12px">No meetings yet</span>';
     } else {
       container.innerHTML = meetings.map(function(m) {
-        var date = new Date(m.createdAt).toLocaleDateString();
+        var date = new Date(m.updatedAt ?? m.createdAt).toLocaleDateString();
         var topic = escapeHtml(m.topic.length > 50 ? m.topic.slice(0,50) + '...' : m.topic);
         var count = (m.participantIds || []).length;
         var msgs = (m.transcript || []).length;
@@ -847,7 +847,7 @@ async function loadPastMeetings() {
     if (emptyBox && meetings.length) {
       emptyBox.innerHTML = '<div style="font-size:14px;color:#a1a5b0;margin-bottom:8px;font-weight:500">Recent Meetings</div>'
         + meetings.slice(0, 5).map(function(m) {
-          var date = new Date(m.createdAt).toLocaleDateString();
+          var date = new Date(m.updatedAt ?? m.createdAt).toLocaleDateString();
           var topic = m.topic.length > 60 ? m.topic.slice(0,60) + '...' : m.topic;
           var msgs = (m.transcript || []).length;
           return '<div class="past-meeting-item" onclick="viewPastMeeting(\'' + m.id + '\')" style="text-align:left">'
@@ -873,7 +873,7 @@ async function loadInterruptedMeetings() {
     }
     section.style.display = '';
     container.innerHTML = meetings.map(function(m) {
-      var date = new Date(m.createdAt).toLocaleDateString();
+      var date = new Date(m.updatedAt ?? m.createdAt).toLocaleDateString();
       var topic = escapeHtml(m.topic.length > 50 ? m.topic.slice(0,50) + '...' : m.topic);
       var count = (m.participantIds || []).length;
       var phase = m.currentPhase || 'unknown';

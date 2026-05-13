@@ -79,6 +79,7 @@ export interface StoredMeeting {
   currentTurn: string | null;
   currentPhase: string | null;
   createdAt: number;
+  updatedAt?: number;
   concludedAt: number | null;
   // Checkpoint/resume fields (all optional for backward compat)
   config?: StoredMeetingConfig;

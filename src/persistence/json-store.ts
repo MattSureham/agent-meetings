@@ -52,7 +52,7 @@ export class JsonFileStore implements DataStore {
       }
     }
 
-    meetings.sort((a, b) => b.createdAt - a.createdAt);
+    meetings.sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
     return meetings;
   }
 

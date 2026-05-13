@@ -71,6 +71,7 @@ export class MeetingEngine {
   phaseTimeline: PhaseTransition[] = [];
   summary: MeetingSummary | null = null;
   createdAt: number;
+  updatedAt?: number;
   concludedAt: number | null = null;
 
   private agents: Map<string, IAgent>;
@@ -179,6 +180,7 @@ export class MeetingEngine {
     // Restore fields that aren't part of MeetingConfig
     engine.status = (stored.status === 'active' || stored.status === 'concluded') ? 'active' : 'pending';
     engine.createdAt = stored.createdAt;
+    engine.updatedAt = Date.now();
     engine.totalTurns = stored.totalTurns ?? stored.transcript.length;
     engine.reasonEnded = (stored.reasonEnded as 'completed' | 'cancelled') ?? 'completed';
     engine.concludedAt = stored.concludedAt;
@@ -329,6 +331,7 @@ export class MeetingEngine {
       currentTurn: this.currentTurn,
       currentPhase: this.currentPhase,
       createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
       concludedAt: this.concludedAt,
       config: {
         turnTimeoutMs: this.turnTimeoutMs,

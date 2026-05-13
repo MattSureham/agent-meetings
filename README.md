@@ -275,21 +275,20 @@ python --version
 git clone https://github.com/MattSureham/teamagents.git
 cd agent-meetings
 npm install
-npm run build
 ```
 
 **Windows (Command Prompt):**
 ```cmd
 git clone https://github.com/MattSureham/teamagents.git
 cd agent-meetings
-npm install && npm run build
+npm install
 ```
 
 **Windows (PowerShell):**
 ```powershell
 git clone https://github.com/MattSureham/teamagents.git
 cd agent-meetings
-npm install; npm run build
+npm install
 ```
 
 ### Step 2 — Set up API keys (.env)
@@ -435,7 +434,6 @@ To set up the framework on a second machine:
 ```bash
 git pull
 npm install        # in case dependencies changed
-npm run build      # recompile TypeScript
 ```
 
 ### Run a meeting (one command)
@@ -549,13 +547,16 @@ Key Points:
 If you want a persistent server for multiple meetings or external protocol agents:
 
 ```bash
-# Terminal 1
-agent-meetings serve
+# Terminal 1 — start the server
+npm start
 
-# Terminal 2
-agent-meetings schedule -t "Architecture review" -a deepseek,minimax
-agent-meetings list meetings
-agent-meetings view <id>
+# Terminal 2 — schedule and manage meetings
+npx tsx src/cli/index.ts schedule -t "Architecture review" -a deepseek,minimax
+npx tsx src/cli/index.ts list meetings
+npx tsx src/cli/index.ts view <id>
+
+# Stop the server
+npm stop
 ```
 
 ### Web Console
@@ -563,8 +564,7 @@ agent-meetings view <id>
 Agent Meetings includes a built-in web UI at `http://127.0.0.1:4200/` — no extra setup required.
 
 ```bash
-npm run build
-node dist/cli/index.js serve
+npm start
 ```
 
 Then open **`http://127.0.0.1:4200/`** in a browser. The web console provides:
