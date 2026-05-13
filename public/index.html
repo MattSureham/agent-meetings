@@ -622,6 +622,8 @@ async function pollMeeting() {
       if (meeting.summary) renderSummary(meeting.summary, meeting.mode, meeting);
       if (meeting.status === 'concluded') {
         showBanner('success', 'Meeting concluded — summary below.');
+        loadPastMeetings();
+        loadInterruptedMeetings();
       }
     }
   } catch(e) { /* retry next tick */ }
