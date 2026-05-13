@@ -213,6 +213,7 @@ export class MeetingEngine {
 
     this.status = 'concluded';
     this.concludedAt = Date.now();
+    await this.checkpoint();
   }
 
   private phaseIdx(phase: MeetingPhase): number {
