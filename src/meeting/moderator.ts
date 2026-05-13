@@ -83,6 +83,9 @@ export class Moderator {
   // ── Collaboration prompts ──
 
   buildPlanPrompt(topic: string, agentName: string): string {
+    const workDirInfo = this.workDir
+      ? `\nWorking directory: ${this.workDir}\n`
+      : '';
     return [
       `PLANNING PHASE — "${topic}"`,
       '',
@@ -92,6 +95,7 @@ export class Moderator {
       '3. Which part do you want to build?',
       '',
       'Be specific. Reference what other team members have already proposed in the transcript.',
+      workDirInfo,
     ].join('\n');
   }
 
