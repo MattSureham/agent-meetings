@@ -14,6 +14,8 @@ export function resumeCommand(): Command {
     .argument('<meeting-id>', 'Meeting ID to resume')
     .option('-c, --config <path>', 'Path to config file', './meetings.config.yml')
     .option('-s, --server <url>', 'Delegate to a running server')
+    .option('--context <string>', 'Override or add context for the continuation')
+    .option('--moderator <id>', 'Override the moderator agent')
     .option('--no-stream', 'Do not stream transcript; only show summary at the end')
     .action(async (meetingId, options) => {
       // Server-delegated resume
@@ -110,8 +112,8 @@ export function resumeCommand(): Command {
         process.exit(1);
       }
 
-      const moderatorAgent = registry.get(stored.moderatorId);
-      const moderatorId = moderatorAgent ? stored.moderatorId : config.meetings.defaultModerator;
+      const moderatorAgent = registry.get(options.moderator ?? stored.moderatorId);
+      const moderatorId = moderatorAgent ? (options.moderator ?? stored.moderatorId) : config.meetings.defaultModerator;
 
       console.log('╔══════════════════════════════════════════════╗');
       console.log('║       AGENT MEETINGS — Resume Session        ║');
@@ -136,6 +138,8 @@ export function resumeCommand(): Command {
       const engine = MeetingEngine.fromStoredMeeting(stored, participants, {
         defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
         checkpointStore: store,
+        context: options.context ?? undefined,
+        moderatorId: options.moderator ?? undefined,
         onTurnStart: (name) => {
           if (stream) {
             process.stdout.write(`  ⏳ Waiting for ${name}...`);

@@ -442,7 +442,12 @@ async function startMeeting() {
   // Build body for either new meeting or continue
   var body;
   if (isContinue) {
-    body = JSON.stringify({ workDir: workDir || undefined });
+    body = JSON.stringify({
+      workDir: workDir || undefined,
+      context: context || undefined,
+      participantIds: participantIds,
+      moderatorId: moderatorId,
+    });
   } else {
     body = JSON.stringify({
       topic, context, participantIds, moderatorId,

@@ -321,7 +321,12 @@ export function createRouter(
 
       if (method === 'POST' && path.startsWith('/meetings/') && path.endsWith('/resume')) {
         const id = path.slice('/meetings/'.length).replace('/resume', '');
-        const body = await readBody<{ workDir?: string }>(req);
+        const body = await readBody<{
+          workDir?: string;
+          context?: string;
+          participantIds?: string[];
+          moderatorId?: string;
+        }>(req);
 
         if (meetings.has(id)) {
           return json(res, 409, { error: 'Meeting is already running' });
@@ -352,11 +357,13 @@ export function createRouter(
           }
         }
 
-        const participants = stored.participantIds
+        // Use provided participant IDs or fall back to stored ones
+        const participantIds = body.participantIds ?? stored.participantIds;
+        const participants = participantIds
           .map((pid) => registry.get(pid))
           .filter((a): a is IAgent => a != null);
 
-        const missingAgents = stored.participantIds.filter((pid) => !registry.get(pid));
+        const missingAgents = participantIds.filter((pid) => !registry.get(pid));
         if (missingAgents.length > 0) {
           return json(res, 400, {
             error: `Agents not available: ${missingAgents.join(', ')}`,
@@ -364,10 +371,18 @@ export function createRouter(
           });
         }
 
+        if (participants.length === 0) {
+          return json(res, 400, { error: 'No available participants found' });
+        }
+
+        const effectiveModeratorId = body.moderatorId ?? stored.moderatorId;
+
         const engine = MeetingEngine.fromStoredMeeting(stored, participants, {
-          defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
+          defaultLLM: registry.getLLMAdapter(effectiveModeratorId) ?? undefined,
           checkpointStore: store,
           workDir: body.workDir ?? undefined,
+          context: body.context ?? undefined,
+          moderatorId: body.moderatorId ?? undefined,
         });
 
         const running: RunningMeeting = { engine, running: null };
