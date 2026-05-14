@@ -28,7 +28,8 @@ export async function createServer(configPath?: string): Promise<ServerInstance>
     start(): Promise<void> {
       return new Promise((resolve) => {
         httpServer.listen(config.server.port, config.server.host, () => {
-          console.log(`Agent Meetings server listening on http://${config.server.host}:${config.server.port}`);
+          const displayHost = config.server.host === '0.0.0.0' ? 'localhost' : config.server.host;
+          console.log(`Agent Meetings server listening on http://${displayHost}:${config.server.port}`);
           resolve();
         });
       });
