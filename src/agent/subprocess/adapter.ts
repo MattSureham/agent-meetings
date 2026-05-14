@@ -42,20 +42,22 @@ export class SubprocessAgent implements IAgent {
       return this.respondViaFile(prompt, promptText);
     }
     if (this.config.promptMode === 'stdin') {
-      return this.respondViaStdin(prompt, promptText);
+      return this.respondViaStdin(promptText);
     }
 
     // Argument mode — if prompt is too large for the Windows command line, fall back to stdin
     if (promptText.length > 28000) {
       return this.respondViaStdinFallback(promptText);
     }
+    // On Windows, multi-line arguments get mangled by CreateProcess command-line joining
+    if (process.platform === 'win32' && promptText.includes('\n')) {
+      return this.respondViaStdinFallback(promptText);
+    }
     return this.respondViaArgs(prompt);
   }
 
   private async respondViaStdinFallback(promptText: string): Promise<AgentResponse> {
-    const args = this.config.args
-      .filter(a => a !== '{prompt}')
-      .map(a => a === '-p' ? '--print' : a.replace('{prompt}', ''));
+    const args = this.buildStdinArgs();
 
     const result = await this.manager.run({
       command: this.config.command,
@@ -109,8 +111,35 @@ export class SubprocessAgent implements IAgent {
     return { content: this.formatOutput(result.stdout, result.stderr) };
   }
 
-  private async respondViaStdin(prompt: MeetingPrompt, promptText: string): Promise<AgentResponse> {
-    const args = this.replaceTokens(this.config.args, prompt, promptText);
+  private buildStdinArgs(): string[] {
+    const result: string[] = [];
+    for (const arg of this.config.args) {
+      if (arg === '{prompt}') {
+        // Standalone token — handle the preceding flag
+        if (result.length > 0) {
+          const prev = result[result.length - 1];
+          if (prev === '-p') {
+            // Claude Code: --print + stdin reads stdin in non-interactive mode
+            result[result.length - 1] = '--print';
+          } else {
+            // Generic: remove the flag (e.g. -q) since prompt goes via stdin
+            result.pop();
+          }
+        }
+        continue;
+      }
+      if (arg.includes('{prompt}')) {
+        // Embedded in another string — replace with stdin marker
+        result.push(arg.replace('{prompt}', '-'));
+        continue;
+      }
+      result.push(arg);
+    }
+    return result;
+  }
+
+  private async respondViaStdin(promptText: string): Promise<AgentResponse> {
+    const args = this.buildStdinArgs();
     const result = await this.manager.run({
       command: this.config.command,
       args,

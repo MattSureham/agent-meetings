@@ -12,6 +12,7 @@ export interface SubprocessAgentDef {
   capabilities: string[];
   command: string;
   args: string[];
+  promptMode?: 'argument' | 'stdin' | 'file';
   env?: Record<string, string>;
   cwd?: string;
   timeoutMs?: number;

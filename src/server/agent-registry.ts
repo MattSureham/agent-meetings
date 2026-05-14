@@ -130,7 +130,7 @@ export class AgentRegistry {
       env: def.env,
       cwd: def.cwd,
       timeoutMs: def.timeoutMs,
-      promptMode: def.args.some((a) => a.includes('{prompt}')) ? 'argument' : 'stdin',
+      promptMode: def.promptMode ?? (def.args.some((a) => a.includes('{prompt}')) ? 'argument' : 'stdin'),
       parseOutput: def.command === 'openclaw' ? parseOpenClawOutput : undefined,
     });
   }
