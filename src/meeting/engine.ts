@@ -150,6 +150,7 @@ export class MeetingEngine {
       workDir?: string;
       context?: string;
       moderatorId?: string;
+      mode?: 'debate' | 'collaboration';
     } = {}
   ): MeetingEngine {
     const storedConfig = stored.config;
@@ -159,7 +160,7 @@ export class MeetingEngine {
       contextImages: stored.contextImages,
       participants,
       moderatorId: options.moderatorId ?? stored.moderatorId,
-      mode: (storedConfig?.mode ?? stored.mode) as 'debate' | 'collaboration',
+      mode: options.mode ?? (storedConfig?.mode ?? stored.mode) as 'debate' | 'collaboration',
       workDir: options.workDir ?? storedConfig?.workDir ?? undefined,
       turnTimeoutMs: storedConfig?.turnTimeoutMs,
       maxRebuttalRounds: storedConfig?.maxRebuttalRounds,

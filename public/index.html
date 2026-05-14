@@ -447,6 +447,7 @@ async function startMeeting() {
       context: context || undefined,
       participantIds: participantIds,
       moderatorId: moderatorId,
+      mode: mode,
     });
   } else {
     body = JSON.stringify({

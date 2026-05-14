@@ -326,6 +326,7 @@ export function createRouter(
           context?: string;
           participantIds?: string[];
           moderatorId?: string;
+          mode?: 'debate' | 'collaboration';
         }>(req);
 
         if (meetings.has(id)) {
@@ -345,7 +346,7 @@ export function createRouter(
         // For concluded meetings, jump to an open discussion phase so agents
         // can dive deeper with full prior transcript as context.
         if (isContinuation) {
-          const contPhase = stored.mode === 'collaboration' ? 'plan' : 'deliberation';
+          const contPhase = (body.mode ?? stored.mode) === 'collaboration' ? 'plan' : 'deliberation';
           stored.currentPhase = contPhase;
           // Clear the resume point so we start fresh from this phase
           stored.resumePoint = undefined;
@@ -383,6 +384,7 @@ export function createRouter(
           workDir: body.workDir ?? undefined,
           context: body.context ?? undefined,
           moderatorId: body.moderatorId ?? undefined,
+          mode: body.mode ?? undefined,
         });
 
         const running: RunningMeeting = { engine, running: null };
