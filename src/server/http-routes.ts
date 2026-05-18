@@ -229,6 +229,7 @@ export function createRouter(
         const autoStart = body.autoStart !== false;
         if (autoStart) {
           running.running = engine.start().then(() => {
+            meetings.delete(engine.id);
             store.saveMeeting(engine.toStoredMeeting()).catch(() => {});
             saveMeetingLog(config.server.dataDir, engine);
           });
