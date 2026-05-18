@@ -199,5 +199,8 @@ function validateConfig(config: Config): void {
   config.meetings.mode = config.meetings.mode ?? 'debate';
   config.meetings.maxRebuttalRounds = config.meetings.maxRebuttalRounds ?? 1;
   config.meetings.maxDeliberationRounds = config.meetings.maxDeliberationRounds ?? 3;
+  config.meetings.maxPlanRounds = config.meetings.maxPlanRounds ?? 1;
+  config.meetings.maxBuildRounds = config.meetings.maxBuildRounds ?? 3;
+  config.meetings.maxReviewRounds = config.meetings.maxReviewRounds ?? 1;
   config.meetings.turnTimeoutMs = config.meetings.turnTimeoutMs ?? 60_000;
 }

@@ -21,6 +21,9 @@ export function runCommand(): Command {
     .option('--turn-timeout <ms>', 'Turn timeout in ms', '60000')
     .option('--rebuttal-rounds <n>', 'Max rebuttal rounds', '1')
     .option('--deliberation-rounds <n>', 'Max deliberation rounds (each round, every hand-raiser speaks)', '3')
+    .option('--plan-rounds <n>', 'Max plan rounds (collaboration)', '1')
+    .option('--build-rounds <n>', 'Max build rounds (collaboration)', '3')
+    .option('--review-rounds <n>', 'Max review rounds (collaboration)', '1')
     .option('--mode <mode>', 'Meeting mode: debate or collaboration', 'debate')
     .option('--work-dir <path>', 'Shared working directory for agents to build in (collaboration mode)')
     .option('--no-stream', 'Do not stream transcript; only show summary at the end')
@@ -136,6 +139,9 @@ export function runCommand(): Command {
         turnTimeoutMs: parseInt(options.turnTimeout, 10),
         maxRebuttalRounds: parseInt(options.rebuttalRounds, 10),
         maxDeliberationRounds: parseInt(options.deliberationRounds, 10),
+        maxPlanRounds: parseInt(options.planRounds, 10),
+        maxBuildRounds: parseInt(options.buildRounds, 10),
+        maxReviewRounds: parseInt(options.reviewRounds, 10),
         defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
         onTurnStart: (name) => {
           if (stream) {

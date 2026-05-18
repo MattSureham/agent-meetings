@@ -16,6 +16,7 @@ export function resumeCommand(): Command {
     .option('-s, --server <url>', 'Delegate to a running server')
     .option('--context <string>', 'Override or add context for the continuation')
     .option('--moderator <id>', 'Override the moderator agent')
+    .option('--build-rounds <n>', 'Override max build rounds', '3')
     .option('--no-stream', 'Do not stream transcript; only show summary at the end')
     .action(async (meetingId, options) => {
       // Server-delegated resume
@@ -140,6 +141,7 @@ export function resumeCommand(): Command {
         checkpointStore: store,
         context: options.context ?? undefined,
         moderatorId: options.moderator ?? undefined,
+        maxBuildRounds: parseInt(options.buildRounds, 10),
         onTurnStart: (name) => {
           if (stream) {
             process.stdout.write(`  ⏳ Waiting for ${name}...`);

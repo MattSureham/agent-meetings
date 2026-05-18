@@ -55,12 +55,18 @@ export interface TurnManagerState {
 
 export interface ResumePoint {
   rebuttalRound: number;
+  planRound?: number;
+  buildRound?: number;
+  reviewRound?: number;
 }
 
 export interface StoredMeetingConfig {
   turnTimeoutMs: number;
   maxRebuttalRounds: number;
   maxDeliberationRounds: number;
+  maxPlanRounds?: number;
+  maxBuildRounds?: number;
+  maxReviewRounds?: number;
   mode: string;
   workDir?: string;
 }

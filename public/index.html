@@ -216,6 +216,7 @@
     <div class="settings-grid">
       <div><label>Rebuttal Rounds</label><input type="number" id="rebuttal-rounds" value="1" min="0" max="10"></div>
       <div><label>Deliberation Turns</label><input type="number" id="deliberation-turns" value="10" min="1" max="100"></div>
+      <div><label>Build Rounds</label><input type="number" id="build-rounds" value="3" min="1" max="20"></div>
       <div><label>Max Total Turns</label><input type="number" id="max-turns" value="50" min="5" max="500"></div>
       <div><label>Turn Timeout (ms)</label><input type="number" id="turn-timeout" value="60000" min="5000" step="5000"></div>
     </div>
@@ -430,6 +431,7 @@ async function startMeeting() {
   const moderatorId = $('#moderator').value;
   const mode = getMode();
   const workDir = $('#workdir').value.trim() || undefined;
+  const buildRounds = parseInt($('#build-rounds').value) || 3;
 
   if (!topic || participantIds.length < 2) return;
 
@@ -448,11 +450,12 @@ async function startMeeting() {
       participantIds: participantIds,
       moderatorId: moderatorId,
       mode: mode,
+      maxBuildRounds: buildRounds,
     });
   } else {
     body = JSON.stringify({
       topic, context, participantIds, moderatorId,
-      autoStart: true, mode, workDir,
+      autoStart: true, mode, workDir, maxBuildRounds: buildRounds,
     });
   }
 
@@ -919,6 +922,7 @@ async function prepareContinue(id) {
     if (meeting.config) {
       $('#rebuttal-rounds').value = meeting.config.maxRebuttalRounds || 1;
       $('#deliberation-turns').value = meeting.config.maxDeliberationRounds || 10;
+      $('#build-rounds').value = meeting.config.maxBuildRounds || 3;
       $('#turn-timeout').value = meeting.config.turnTimeoutMs || 60000;
     }
 

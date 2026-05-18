@@ -35,6 +35,9 @@ interface CreateMeetingBody {
   autoStart?: boolean;
   mode?: 'debate' | 'collaboration';
   workDir?: string;
+  maxPlanRounds?: number;
+  maxBuildRounds?: number;
+  maxReviewRounds?: number;
 }
 
 interface CreateAgentBody {
@@ -211,6 +214,9 @@ export function createRouter(
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationRounds: config.meetings.maxDeliberationRounds,
+          maxPlanRounds: body.maxPlanRounds ?? config.meetings.maxPlanRounds,
+          maxBuildRounds: body.maxBuildRounds ?? config.meetings.maxBuildRounds,
+          maxReviewRounds: body.maxReviewRounds ?? config.meetings.maxReviewRounds,
           defaultLLM: registry.getLLMAdapter(moderatorId) ?? undefined,
           checkpointStore: store,
         });
@@ -303,6 +309,9 @@ export function createRouter(
           turnTimeoutMs: config.meetings.turnTimeoutMs,
           maxRebuttalRounds: config.meetings.maxRebuttalRounds,
           maxDeliberationRounds: config.meetings.maxDeliberationRounds,
+          maxPlanRounds: config.meetings.maxPlanRounds,
+          maxBuildRounds: config.meetings.maxBuildRounds,
+          maxReviewRounds: config.meetings.maxReviewRounds,
           defaultLLM: registry.getLLMAdapter(stored.moderatorId) ?? undefined,
           resumeId: stored.id,
           checkpointStore: store,
@@ -327,6 +336,9 @@ export function createRouter(
           participantIds?: string[];
           moderatorId?: string;
           mode?: 'debate' | 'collaboration';
+          maxPlanRounds?: number;
+          maxBuildRounds?: number;
+          maxReviewRounds?: number;
         }>(req);
 
         if (meetings.has(id)) {
@@ -385,6 +397,9 @@ export function createRouter(
           context: body.context ?? undefined,
           moderatorId: body.moderatorId ?? undefined,
           mode: body.mode ?? undefined,
+          maxPlanRounds: body.maxPlanRounds ?? undefined,
+          maxBuildRounds: body.maxBuildRounds ?? undefined,
+          maxReviewRounds: body.maxReviewRounds ?? undefined,
         });
 
         const running: RunningMeeting = { engine, running: null };

@@ -27,6 +27,9 @@ export interface MeetingConfig {
   turnTimeoutMs?: number;
   maxRebuttalRounds?: number;
   maxDeliberationRounds?: number;
+  maxPlanRounds?: number;
+  maxBuildRounds?: number;
+  maxReviewRounds?: number;
   defaultLLM?: LLMAdapter;
   onTurnStart?: (agentName: string) => void;
   onTurnEnd?: (agentName: string) => void;
@@ -81,6 +84,9 @@ export class MeetingEngine {
   private turnTimeoutMs: number;
   private maxRebuttalRounds: number;
   private maxDeliberationRounds: number;
+  private maxPlanRounds: number;
+  private maxBuildRounds: number;
+  private maxReviewRounds: number;
   private aborted = false;
   private totalTurns = 0;
   reasonEnded: 'completed' | 'cancelled' = 'completed';
@@ -100,6 +106,9 @@ export class MeetingEngine {
     this.turnTimeoutMs = config.turnTimeoutMs ?? 60_000;
     this.maxRebuttalRounds = config.maxRebuttalRounds ?? 1;
     this.maxDeliberationRounds = config.maxDeliberationRounds ?? 3;
+    this.maxPlanRounds = config.maxPlanRounds ?? 1;
+    this.maxBuildRounds = config.maxBuildRounds ?? 3;
+    this.maxReviewRounds = config.maxReviewRounds ?? 1;
     this.createdAt = Date.now();
     this.participantIds = config.participants.map((a) => a.id);
 
@@ -151,6 +160,9 @@ export class MeetingEngine {
       context?: string;
       moderatorId?: string;
       mode?: 'debate' | 'collaboration';
+      maxPlanRounds?: number;
+      maxBuildRounds?: number;
+      maxReviewRounds?: number;
     } = {}
   ): MeetingEngine {
     const storedConfig = stored.config;
@@ -165,6 +177,9 @@ export class MeetingEngine {
       turnTimeoutMs: storedConfig?.turnTimeoutMs,
       maxRebuttalRounds: storedConfig?.maxRebuttalRounds,
       maxDeliberationRounds: storedConfig?.maxDeliberationRounds,
+      maxPlanRounds: options.maxPlanRounds ?? storedConfig?.maxPlanRounds,
+      maxBuildRounds: options.maxBuildRounds ?? storedConfig?.maxBuildRounds,
+      maxReviewRounds: options.maxReviewRounds ?? storedConfig?.maxReviewRounds,
       defaultLLM: options.defaultLLM,
       onTurnStart: options.onTurnStart,
       onTurnEnd: options.onTurnEnd,
@@ -282,22 +297,49 @@ export class MeetingEngine {
 
     // PLAN
     if (this.shouldEnterPhase(MeetingPhase.PLAN)) {
-      await this.advancePhase(MeetingPhase.PLAN);
-      await this.runRoundRobin(MeetingPhase.PLAN);
+      const startPlan =
+        this.isResuming && this.currentPhase === MeetingPhase.PLAN
+          ? this.resumePoint.planRound ?? 0
+          : 0;
+      for (let r = startPlan; r < this.maxPlanRounds; r++) {
+        this.resumePoint.planRound = r;
+        await this.advancePhase(MeetingPhase.PLAN);
+        await this.runRoundRobin(MeetingPhase.PLAN);
+        if (this.aborted) break;
+        this.turnManager.resetRound();
+      }
       if (this.aborted) return;
     }
 
     // BUILD
     if (this.shouldEnterPhase(MeetingPhase.BUILD)) {
-      await this.advancePhase(MeetingPhase.BUILD);
-      await this.runRoundRobin(MeetingPhase.BUILD);
+      const startBuild =
+        this.isResuming && this.currentPhase === MeetingPhase.BUILD
+          ? this.resumePoint.buildRound ?? 0
+          : 0;
+      for (let r = startBuild; r < this.maxBuildRounds; r++) {
+        this.resumePoint.buildRound = r;
+        await this.advancePhase(MeetingPhase.BUILD);
+        await this.runRoundRobin(MeetingPhase.BUILD);
+        if (this.aborted) break;
+        this.turnManager.resetRound();
+      }
       if (this.aborted) return;
     }
 
     // REVIEW
     if (this.shouldEnterPhase(MeetingPhase.REVIEW)) {
-      await this.advancePhase(MeetingPhase.REVIEW);
-      await this.runRoundRobin(MeetingPhase.REVIEW);
+      const startReview =
+        this.isResuming && this.currentPhase === MeetingPhase.REVIEW
+          ? this.resumePoint.reviewRound ?? 0
+          : 0;
+      for (let r = startReview; r < this.maxReviewRounds; r++) {
+        this.resumePoint.reviewRound = r;
+        await this.advancePhase(MeetingPhase.REVIEW);
+        await this.runRoundRobin(MeetingPhase.REVIEW);
+        if (this.aborted) break;
+        this.turnManager.resetRound();
+      }
     }
   }
 
@@ -338,6 +380,9 @@ export class MeetingEngine {
         turnTimeoutMs: this.turnTimeoutMs,
         maxRebuttalRounds: this.maxRebuttalRounds,
         maxDeliberationRounds: this.maxDeliberationRounds,
+        maxPlanRounds: this.maxPlanRounds,
+        maxBuildRounds: this.maxBuildRounds,
+        maxReviewRounds: this.maxReviewRounds,
         mode: this.mode,
         workDir: this.moderator.activeWorkDir ?? undefined,
       },
