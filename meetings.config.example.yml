@@ -1,41 +1,116 @@
+# =============================================================================
 # Agent Meetings — Example Configuration
+# =============================================================================
 #
-# Copy this file to meetings.config.yml, add your API keys, and customize.
+# Copy this file to get started:
+#   cp meetings.config.example.yml meetings.config.yml
+#
+# Then fill in your API keys (see .env.example) and customize agents to taste.
+#
+# =============================================================================
+# AGENT TYPES
+# =============================================================================
+#
+#   llm       — Cloud or local LLM accessed via API (OpenAI-compatible).
+#               The framework calls the API directly each turn.
+#   browser   — Free chat UIs (ChatGPT, Claude, Gemini, DeepSeek).
+#               A Playwright browser window opens; you log in once manually.
+#   subprocess — CLI tools spawned as child processes each turn.
+#               The full meeting transcript is passed as the prompt.
+#               These agents can write code, run commands, and create files.
+#
+# =============================================================================
+# SUBPROCESS PROMPT TOKENS
+# =============================================================================
+#
+#   {prompt}    — Replaced with the full meeting context + current turn prompt.
+#   {meetingId} — Replaced with the meeting UUID (useful for session tracking).
+#   {file}      — Replaced with path to a temp file containing the prompt.
+#                 Only used when promptMode is "file".
+#
+# =============================================================================
+# SUBPROCESS PROMPT MODES (promptMode)
+# =============================================================================
+#
+#   argument (default if {prompt} in args) — Prompt passed as a CLI argument.
+#     Fast and simple, but multi-line prompts break on Windows. The framework
+#     auto-falls back to stdin on Windows when the prompt contains newlines.
+#
+#   stdin — Prompt piped via stdin. The args still undergo token replacement.
+#     Best for cross-platform reliability. Set explicitly to force this mode.
+#
+#   file — Prompt written to a temp file, path passed via {file} token.
+#     Use for very large prompts or tools that only accept file input.
+#
+# =============================================================================
+# LLM PROVIDERS
+# =============================================================================
+#
+#   anthropic     — Claude (claude-sonnet-4-20250514, etc.)
+#   openai        — GPT-4o, etc.
+#   deepseek      — DeepSeek (deepseek-chat, deepseek-reasoner, etc.)
+#   minimax       — MiniMax (abab6.5s-chat, minimax-m2.7)
+#   gemini        — Google Gemini (gemini-2.0-flash, etc.)
+#   qwen          — Alibaba Qwen (qwen-max, etc.)
+#   kimi          — Moonshot Kimi (kimi-latest)
+#   kimi-code     — Moonshot Kimi for Coding
+#   ollama        — Local Ollama (no API key needed)
+#   openai-compat — Any OpenAI-compatible endpoint (vLLM, LM Studio, etc.)
+#
+# All providers use OpenAI-compatible chat completions under the hood.
+# Set endpoint to override the default API base URL.
+#
+# =============================================================================
 
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
 server:
-  port: 4200
-  host: "0.0.0.0"
-  dataDir: "./data"
+  port: 4200                      # Port the HTTP + WebSocket server listens on
+  host: "0.0.0.0"                 # Bind address — 0.0.0.0 = all interfaces
+  dataDir: "./data"               # Meeting checkpoints, agent registry, logs
 
+# ---------------------------------------------------------------------------
+# Agents
+# ---------------------------------------------------------------------------
 agents:
-  # LLM agent — Anthropic
+
+  # ── LLM Agents ──────────────────────────────────────────────────────────
+
   - id: claude-sonnet
     name: "Claude Sonnet"
     type: llm
-    capabilities: [analysis, reasoning, writing]
+    capabilities: [analysis, reasoning, writing, coding]
     provider: anthropic
     model: claude-sonnet-4-20250514
-    apiKey: "${ANTHROPIC_API_KEY}"
+    apiKey: "${ANTHROPIC_API_KEY}"    # Set in .env file
+    # vision: true                    # Uncomment if the model supports images
 
-  # LLM agent — OpenAI
-  - id: gpt-4
-    name: "GPT-4"
+  - id: gpt-4o
+    name: "GPT-4o"
     type: llm
-    capabilities: [general, creative, brainstorming]
+    capabilities: [general, creative, brainstorming, coding]
     provider: openai
     model: gpt-4o
     apiKey: "${OPENAI_API_KEY}"
 
-  # LLM agent — DeepSeek
   - id: deepseek
     name: "DeepSeek"
     type: llm
-    capabilities: [architecture, planning, coding, analysis]
+    capabilities: [architecture, planning, coding, analysis, reasoning]
     provider: deepseek
     model: deepseek-chat
     apiKey: "${DEEPSEEK_API_KEY}"
+    # vision: true                    # deepseek-chat supports vision
 
-  # LLM agent — MiniMax
+  - id: deepseek-reasoner
+    name: "DeepSeek Reasoner"
+    type: llm
+    capabilities: [architecture, planning, reasoning, analysis]
+    provider: deepseek
+    model: deepseek-reasoner
+    apiKey: "${DEEPSEEK_API_KEY}"
+
   - id: minimax
     name: "MiniMax"
     type: llm
@@ -44,7 +119,6 @@ agents:
     model: abab6.5s-chat
     apiKey: "${MINIMAX_API_KEY}"
 
-  # LLM agent — Gemini
   - id: gemini
     name: "Gemini"
     type: llm
@@ -53,40 +127,182 @@ agents:
     model: gemini-2.0-flash
     apiKey: "${GEMINI_API_KEY}"
 
-  # LLM agent — Local Ollama (no API key needed)
-  - id: local-mistral
-    name: "Mistral (Local)"
+  - id: qwen
+    name: "Qwen"
+    type: llm
+    capabilities: [coding, reasoning, analysis]
+    provider: qwen
+    model: qwen-max
+    apiKey: "${QWEN_API_KEY}"
+
+  - id: kimi
+    name: "Kimi"
+    type: llm
+    capabilities: [coding, analysis, reasoning]
+    provider: kimi
+    model: kimi-latest
+    apiKey: "${MOONSHOT_API_KEY}"
+
+  # ── Local LLM (no cloud API key) ────────────────────────────────────────
+
+  - id: local-ollama
+    name: "Ollama (Local)"
     type: llm
     capabilities: [general, coding]
     provider: ollama
-    model: mistral
-    apiKey: ""
-    endpoint: "http://127.0.0.1:11434"
+    model: mistral                     # Any model you've pulled in Ollama
+    apiKey: ""                         # Not needed for local
+    endpoint: "http://127.0.0.1:11434/v1"
 
-  # Subprocess agent — spawns claude CLI per turn
+  - id: local-vllm
+    name: "vLLM (Local)"
+    type: llm
+    capabilities: [coding, reasoning]
+    provider: openai-compat
+    model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+    apiKey: "not-needed"
+    endpoint: "http://127.0.0.1:8000/v1"
+
+  # ── Browser Agents (free chat UIs) ──────────────────────────────────────
+  # A Playwright browser window opens on first use. Log in once manually.
+  # The session is persisted, so subsequent turns reuse the logged-in state.
+
+  - id: chatgpt
+    name: "ChatGPT"
+    type: browser
+    capabilities: [general, creative, brainstorming, coding]
+    site: chatgpt                     # chatgpt | claude | gemini | deepseek
+    timeoutMs: 120000                 # Max wait for a response (2 min)
+
+  - id: claude-web
+    name: "Claude Web"
+    type: browser
+    capabilities: [analysis, reasoning, writing, coding]
+    site: claude
+    timeoutMs: 120000
+
+  - id: gemini-web
+    name: "Gemini Web"
+    type: browser
+    capabilities: [general, coding, multimodal]
+    site: gemini
+    timeoutMs: 120000
+
+  - id: deepseek-web
+    name: "DeepSeek Web"
+    type: browser
+    capabilities: [coding, analysis, architecture]
+    site: deepseek
+    timeoutMs: 120000
+
+  # ── Subprocess Agents (CLI tools) ───────────────────────────────────────
+  #
+  # These spawn as child processes each turn. The full transcript + current
+  # prompt is passed via CLI args, stdin, or a temp file (see promptMode).
+  #
+  # IMPORTANT (cross-platform):
+  #   Use bare command names (e.g. "claude") — they resolve from your PATH.
+  #   Avoid absolute paths like "/Users/.../python" — they won't work on
+  #   other machines or Windows. If the tool isn't on PATH, install it
+  #   globally or add its directory to PATH.
+  #
+  # FIELDS:
+  #   command   — The executable (resolved from PATH).
+  #   args      — CLI arguments. Use {prompt}, {meetingId}, {file} tokens.
+  #   tool      — "claude-code" for Claude Code, or "generic" for everything else.
+  #   promptMode — (optional) "argument" | "stdin" | "file". Auto-detected from
+  #                {prompt} in args by default. Set explicitly to force a mode.
+  #   cwd       — (optional) Working directory the process starts in.
+  #   env       — (optional) Extra environment variables.
+  #   timeoutMs — (optional) Max time before the turn is cut off (ms).
+  #               Default 60,000 (1 min). Long builds may need more.
+
   - id: claude-code
     name: "Claude Code"
     type: subprocess
     tool: claude-code
-    capabilities: [typescript, architecture, code-review, security]
+    capabilities: [coding, building, debugging, testing, architecture]
     command: claude
-    args: ["-p", "{prompt}", "--output-format", "text"]
-    timeoutMs: 120000
+    args:
+      - "-p"
+      - "{prompt}"
+      - "--output-format"
+      - "text"
+      - "--permission-mode"
+      - "bypassPermissions"
+      - "--bare"
+    timeoutMs: 3600000                # 1 hour for long builds
 
-  # Generic subprocess agent
-  - id: openclaw
-    name: "OpenClaw"
+  # Generic subprocess — works with any CLI tool that accepts a prompt
+
+  - id: codex
+    name: "Codex"
     type: subprocess
     tool: generic
-    capabilities: [python, data-science, ml]
-    command: openclaw
-    args: ["agent", "--local", "--json", "-m", "{prompt}"]
-    timeoutMs: 120000
+    capabilities: [coding, building, debugging, testing, architecture]
+    command: codex                    # Must be on your PATH
+    args: ["exec", "{prompt}", "--full-auto"]
+    timeoutMs: 1800000                # 30 minutes
 
+  - id: opencode
+    name: "OpenCode"
+    type: subprocess
+    tool: generic
+    capabilities: [coding, building, debugging, testing, architecture]
+    command: opencode
+    args:
+      - "run"
+      - "{prompt}"
+      - "-m"
+      - "deepseek/deepseek-v4-pro"
+      - "--dangerously-skip-permissions"
+    timeoutMs: 1800000
+
+  # Example: Python-based agent with explicit cwd and promptMode
+  # - id: hermes
+  #   name: "Hermes"
+  #   type: subprocess
+  #   tool: generic
+  #   capabilities: [coding, building, debugging, architecture]
+  #   command: python                 # Resolved from PATH
+  #   args: ["run_agent.py", "-q", "{prompt}", "--max_turns", "15"]
+  #   cwd: ./hermes-agent             # Relative to repo root (or absolute)
+  #   promptMode: stdin               # Force stdin to avoid Windows arg issues
+  #   timeoutMs: 1800000
+
+  # Example: agent with extra environment variables
+  # - id: custom-agent
+  #   name: "Custom Agent"
+  #   type: subprocess
+  #   tool: generic
+  #   capabilities: [coding]
+  #   command: my-agent
+  #   args: ["--prompt", "{prompt}"]
+  #   env:
+  #     MY_API_KEY: "${MY_API_KEY}"
+  #     DEBUG: "1"
+
+# ---------------------------------------------------------------------------
+# Meetings — defaults for all meetings
+# ---------------------------------------------------------------------------
 meetings:
-  mode: debate                    # "debate" (structured debate) or "collaboration" (plan → build → review)
-  turnTimeoutMs: 60000
-  maxRebuttalRounds: 1
-  maxDeliberationTurns: 10
-  maxTotalTurns: 50
-  defaultModerator: claude-sonnet
+  mode: debate                      # "debate" or "collaboration" (plan → build → review)
+  turnTimeoutMs: 60000              # Max ms per agent turn (60s)
+  maxRebuttalRounds: 1              # Debate: rebuttal round-robin rounds
+  maxDeliberationRounds: 3          # Debate: deliberation rounds (hand-raising)
+  maxPlanRounds: 1                  # Collaboration: how many plan rounds
+  maxBuildRounds: 3                 # Collaboration: how many build rounds
+  maxReviewRounds: 1                # Collaboration: how many review rounds
+  defaultModerator: claude-sonnet   # Agent ID used for moderator/summary
+
+  # ── Presets ─────────────────────────────────────────────────────────────
+  # Quick-select agent groups in the web UI and CLI (--preset <name>).
+  # Each preset lists agent IDs and optionally a different moderator.
+  presets:
+    debate:
+      agents: [deepseek, deepseek-reasoner, minimax, qwen, kimi]
+    builders:
+      agents: [claude-code, codex, opencode]
+      moderator: deepseek           # Override moderator for this preset
+    all:
+      agents: [chatgpt, claude-web, gemini-web, deepseek-web, claude-code, codex, opencode, deepseek, deepseek-reasoner, minimax, qwen, kimi]
