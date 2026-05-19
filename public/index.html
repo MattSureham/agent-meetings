@@ -955,6 +955,9 @@ async function prepareContinue(id) {
 }
 
 function viewPastMeeting(id) {
+  meetingId = id;
+  $('#download-log').style.display = 'inline';
+  $('#save-snapshot').style.display = 'inline';
   fetch('/meetings/' + id).then(function(r) { return r.json(); }).then(function(meeting) {
     var container = $('#transcript-container');
     container.innerHTML = '';
